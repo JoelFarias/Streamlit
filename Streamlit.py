@@ -15,12 +15,7 @@ def load_data():
     Carrega os dados do banco de dados e renomeia as colunas.
     """
     try:
-        cone = pg.connect(
-            dbname="Data_IESB",
-            user="Data_IESB",
-            password="DATA_IESB",
-            host="dataiesb.iesbtech.com.br",
-        )
+
 
         cur = cone.cursor()
 
