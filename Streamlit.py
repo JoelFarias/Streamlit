@@ -15,9 +15,16 @@ def load_data():
     Carrega os dados do banco de dados e renomeia as colunas.
     """
     try:
+        st.write("Tentando conectar ao banco de dados...")
+        conexao = pg.connect(
+            host=st.secrets["DB_HOST"],
+            database=st.secrets["DB_NAME"],
+            user=st.secrets["DB_USERNAME"],
+            password=st.secrets["DB_PASSWORD"]
+        )
 
-
-        cur = cone.cursor()
+        cur = conexao.cursor()
+        st.write("Conexão estabelecida com sucesso.")
 
         query = """
         SELECT 
@@ -42,7 +49,9 @@ def load_data():
         df = pd.DataFrame(data, columns=colnames)
 
         cur.close()
-        cone.close()
+        conexao.close()
+
+        st.write("Dados carregados com sucesso.")
 
         mapeamento_colunas = {
             'ano_pesquisa': 'Ano',
@@ -64,6 +73,11 @@ def load_data():
             df['População'] = pd.to_numeric(df['População'], errors='coerce')
 
         return df
+
+    except Exception as e:
+        st.error(f"Erro ao carregar os dados: {e}")
+        return pd.DataFrame()
+
 
     except Exception as e:
         st.error(f"Erro ao conectar ao banco de dados: {e}")
@@ -147,18 +161,17 @@ def main():
                 regiao = st.sidebar.selectbox("Região (opcional)", options=["Todas"] + sorted(regioes_disponiveis))
 
                 filtered_df = df[
-                    (df['Ano'] == ano_pesquisa) &
-                    (df['Estados'] == estado if estado != "Todos" else df['Estados']) &
-                    (df['Regiões'] == regiao if regiao != "Todas" else df['Regiões'])
+                    (df['Ano'] == ano_pesquisa) & 
+                    ((df['Estados'] == estado) if estado != "Todos" else True) &
+                    ((df['Regiões'] == regiao) if regiao != "Todas" else True)
                 ]
 
-                if 'População' in filtered_df.columns:
-                    if not filtered_df.empty:
-                        st.write("Estatísticas Descritivas para População:")
-                        estatisticas = filtered_df['População'].describe()
-                        st.write(estatisticas)
-                    else:
-                        st.write("Nenhum dado disponível para os filtros selecionados.")
+                if not filtered_df.empty:
+                    st.write("Estatísticas Descritivas para População:")
+                    estatisticas = filtered_df['População'].describe()
+                    st.write(estatisticas)
+                else:
+                    st.write("Nenhum dado disponível para os filtros selecionados.")
         else:
             st.write("Carregue os dados na seção 'Carregar Dados'.")
 
@@ -182,7 +195,7 @@ def main():
                 regiao = st.sidebar.selectbox("Região", options=["Todas"] + sorted(regioes_disponiveis))
 
                 filtered_df = df[
-                    (df['Ano'] == ano_pesquisa) &
+                    (df['Ano'] == ano_pesquisa) & 
                     ((df['Estados'] == estado) if estado != "Todos" else True) &
                     ((df['Regiões'] == regiao) if regiao != "Todas" else True)
                 ]
