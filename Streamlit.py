@@ -76,18 +76,18 @@ def load_data():
 
     except KeyError as e:
         st.error(f"Chave de configuração faltando: {e}")
-        return pd.DataFrame()  # Retornar DataFrame vazio em caso de exceção
+        return pd.DataFrame()  
 
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
-        return pd.DataFrame()  # Retornar DataFrame vazio em caso de exceção
+        return pd.DataFrame()  
 
 
 def display_graphs(df, x_col, y_col, grafico_selecionado):
     """
     Exibe gráficos com base nas colunas e tipo de gráfico selecionado.
     """
-    if df is not None and not df.empty:  # Adiciona verificação se o df não é None
+    if df is not None and not df.empty:
         if 'Barra' in grafico_selecionado:
             fig1 = px.bar(df, x=x_col, y=y_col, color='Estados', barmode='group',
                           title=f'{y_col} por {x_col}')
@@ -113,7 +113,7 @@ def display_map(df):
     Exibe o mapa de população por município.
     """
     st.subheader("Mapa de População por Município")
-    if df is not None and not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:  # Adiciona verificação se o df não é None
+    if df is not None and not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns: 
         mapa_fig = px.scatter_mapbox(df, lat="Latitude", lon="Longitude", size="População",
                                      color="Estados", hover_name="Município",
                                      title="Distribuição Populacional",
