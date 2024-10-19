@@ -1,57 +1,42 @@
-import streamlit as st
+import plotly.express as px
+import unicodedata
+from fuzzywuzzy import process
+import os
 import psycopg2 as pg
 import pandas as pd
-import plotly.express as px
+import streamlit as st
 
-def renomear_colunas(df, mapeamento_colunas):
-    """
-    Renomeia as colunas de um DataFrame com base em um dicionário de mapeamento.
-    """
-    return df.rename(columns=mapeamento_colunas)
-
-@st.cache_data
-def load_data():
-    """
-    Carrega os dados do banco de dados e renomeia as colunas.
-    """
+@st.cache_data(ttl=600)
+def load_data() -> pd.DataFrame | None:
+    """Carrega os dados do banco de dados e renomeia as colunas."""
     try:
-        st.write("Tentando conectar ao banco de dados...")
-        conexao = pg.connect(
+        conn = pg.connect(
             host=st.secrets["DB_HOST"],
             database=st.secrets["DB_NAME"],
             user=st.secrets["DB_USERNAME"],
             password=st.secrets["DB_PASSWORD"]
         )
-
-        cur = conexao.cursor()
-        st.write("Conexão estabelecida com sucesso.")
-
-        query = """
-        SELECT 
-            p.ano_pesquisa, 
-            p.numero_habitantes, 
-            p.faixa_populacao, 
-            m.nome_municipio, 
-            u.nome_uf, 
-            r.nome_regiao, 
-            m.latitude, 
-            m.longitude 
-        FROM populacao p
-        JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
-        JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
-        JOIN regiao r ON u.cd_regiao = r.cd_regiao
-        """
-        
-        cur.execute(query)
-        data = cur.fetchall()
-        colnames = [desc[0] for desc in cur.description]
+        with conn.cursor() as cur:
+            query = """
+            SELECT 
+                p.ano_pesquisa, 
+                p.numero_habitantes, 
+                p.faixa_populacao, 
+                m.nome_municipio, 
+                u.nome_uf, 
+                r.nome_regiao, 
+                m.latitude, 
+                m.longitude 
+            FROM populacao p
+            JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
+            JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
+            JOIN regiao r ON u.cd_regiao = r.cd_regiao
+            """
+            cur.execute(query)
+            data = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
 
         df = pd.DataFrame(data, columns=colnames)
-
-        cur.close()
-        conexao.close()
-
-        st.write("Dados carregados com sucesso.")
 
         mapeamento_colunas = {
             'ano_pesquisa': 'Ano',
@@ -63,162 +48,176 @@ def load_data():
             'latitude': 'Latitude',
             'longitude': 'Longitude'
         }
-
         df = renomear_colunas(df, mapeamento_colunas)
-
-        if 'Ano' in df.columns:
-            df['Ano'] = df['Ano'].astype(str)
-        
-        if 'População' in df.columns:
-            df['População'] = pd.to_numeric(df['População'], errors='coerce')
+        df['Ano'] = df['Ano'].astype(str)
+        df['População'] = pd.to_numeric(df['População'], errors='coerce')
 
         return df
 
-    except KeyError as e:
-        st.error(f"Chave de configuração faltando: {e}")
-        return pd.DataFrame()  
-
-    except Exception as e:
+    except (pg.Error, Exception) as e:
         st.error(f"Erro ao carregar os dados: {e}")
-        return pd.DataFrame()  
+        return None
+    finally:
+        if conn:
+            conn.close()
 
+def get_dataframe() -> pd.DataFrame | None:
+    """Recupera o DataFrame armazenado na sessão."""
+    return st.session_state.get('df', None)
 
-def display_graphs(df, x_col, y_col, grafico_selecionado):
-    """
-    Exibe gráficos com base nas colunas e tipo de gráfico selecionado.
-    """
-    if df is not None and not df.empty:
-        if 'Barra' in grafico_selecionado:
-            fig1 = px.bar(df, x=x_col, y=y_col, color='Estados', barmode='group',
-                          title=f'{y_col} por {x_col}')
-            fig1.update_layout(xaxis_title=x_col, yaxis_title=y_col)
-            st.plotly_chart(fig1)
+def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
+    """Renomeia as colunas de um DataFrame."""
+    return df.rename(columns=mapeamento_colunas)
 
-        if 'Pizza' in grafico_selecionado:
-            fig2 = px.pie(df, names=x_col, values=y_col,
-                          title=f'Distribuição de {y_col} por {x_col}')
-            fig2.update_layout(title_text=f'Distribuição de {y_col} por {x_col}')
-            st.plotly_chart(fig2)
+def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
+    """Filtra os dados com base nos parâmetros fornecidos."""
+    return df[
+        (df['Ano'] == ano) &
+        ((df['Estados'] == estado) if estado != "Todos" else True) &
+        ((df['Regiões'] == regiao) if regiao != "Todas" else True)
+    ]
 
-        if 'Linha' in grafico_selecionado:
-            fig3 = px.line(df, x=x_col, y=y_col, color='Estados',
-                           title=f'{y_col} ao longo de {x_col}')
-            fig3.update_layout(xaxis_title=x_col, yaxis_title=y_col)
-            st.plotly_chart(fig3)
-    else:
-        st.write("Nenhum dado disponível para os filtros selecionados.")
+def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
+    """Exibe gráficos com base na seleção."""
+    if df.empty:
+        st.warning("Nenhum dado disponível para os filtros selecionados.")
+        return
 
-def display_map(df):
-    """
-    Exibe o mapa de população por município.
-    """
-    st.subheader("Mapa de População por Município")
-    if df is not None and not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns: 
-        mapa_fig = px.scatter_mapbox(df, lat="Latitude", lon="Longitude", size="População",
-                                     color="Estados", hover_name="Município",
-                                     title="Distribuição Populacional",
-                                     mapbox_style="carto-positron", zoom=3)
-        st.plotly_chart(mapa_fig)
-    else:
+    if not pd.api.types.is_numeric_dtype(df[y_col]):
+        st.error(f"Erro: A coluna '{y_col}' precisa ser numérica para este gráfico.")
+        return
+
+    try:
+        if grafico == 'Barra':
+            fig = px.bar(df, x=x_col, y=y_col, color='Estados', barmode='group', title=f'{y_col} por {x_col}')
+        elif grafico == 'Pizza':
+            fig = px.pie(df, names=x_col, values=y_col, title=f'Distribuição de {y_col} por {x_col}')
+        elif grafico == 'Linha':
+            fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
+        st.plotly_chart(fig)
+    except ValueError as e:
+        st.error(f"Erro ao exibir o gráfico: {e}")
+
+def display_map(df: pd.DataFrame):
+    """Exibe o mapa de população por município."""
+    if df.empty or 'Latitude' not in df.columns or 'Longitude' not in df.columns:
         st.write("Dados de latitude e longitude não disponíveis.")
+        return
 
-def main():
-    """
-    Função principal para exibir a aplicação Streamlit.
-    """
-    st.title("Análise de Dados Populacionais")
+    mapa_fig = px.scatter_mapbox(
+        df, lat="Latitude", lon="Longitude", size="População", color="Estados",
+        hover_name="Município", title="Distribuição Populacional",
+        mapbox_style="carto-positron", zoom=3
+    )
+    st.plotly_chart(mapa_fig)
 
-    menu = st.sidebar.selectbox("Menu", ["Carregar Dados", "Estatísticas", "Visualização"])
-
-    if menu == "Carregar Dados":
-        st.subheader("Carregar e Visualizar Dados")
-        
+def carregar_dados():
+    """Carrega e exibe os dados na interface."""
+    with st.spinner('Carregando dados...'):
         df = load_data()
-
-        if df is not None and df.empty:
-            st.write("Nenhum dado disponível.")
-        else:
-            st.write("Visualização das primeiras linhas do DataFrame:")
+        if df is not None:
             st.dataframe(df.head())
             st.session_state.df = df
 
+def exibir_estatisticas():
+    """Exibe as estatísticas com base nos filtros de ano, estado e região."""
+    df = get_dataframe()
+    if df is not None:
+        ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
+        estado = st.sidebar.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
+        regiao = st.sidebar.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+
+        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+        if not filtered_df.empty:
+            st.write("Estatísticas Descritivas para População:")
+            st.write(filtered_df['População'].describe())
+
+def remover_acentos_e_lower(texto: str) -> str:
+    """Remove acentos e converte o texto para minúsculas."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
+
+def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
+    """Sugere municípios com base no nome digitado pelo usuário."""
+    municipios = df['Município'].unique()
+    municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
+
+    municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
+    sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
+
+    return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
+
+def exibir_visualizacao():
+    """Exibe gráficos e mapas de acordo com os filtros aplicados."""
+    df = get_dataframe()
+    if df is not None:
+        ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
+        estado = st.sidebar.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
+        regiao = st.sidebar.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+
+        grafico_selecionado = st.sidebar.multiselect("Escolha os gráficos para exibir:", ["Barra", "Pizza", "Linha", "Mapa"])
+
+        colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
+        colunas_numericas = ['População']
+
+        if 'Pizza' in grafico_selecionado or 'Barra' in grafico_selecionado:
+            max_categorias = st.sidebar.slider("Número máximo de categorias a exibir", min_value=5, max_value=20, value=10)
+            categoria_especifica = st.sidebar.text_input("Buscar uma categoria específica (Município)", "")
+
+            if categoria_especifica:
+                sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
+                st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
+                
+                municipio_selecionado = st.sidebar.selectbox("Selecione um município sugerido", sugestoes)
+                categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
+                df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
+
+        if 'Barra' in grafico_selecionado:
+            x_col = st.selectbox("Selecione a coluna X (categórica):", options=colunas_categoricas)
+            y_col = st.selectbox("Selecione a coluna Y (numérica):", options=colunas_numericas)
+
+            top_n_df = filtered_df.nlargest(max_categorias, y_col)
+
+            if categoria_especifica and municipio_selecionado:
+                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
+                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
+
+            display_graphs(top_n_df, x_col, y_col, 'Barra')
+
+        if 'Pizza' in grafico_selecionado:
+            x_col = st.selectbox("Selecione a coluna para as fatias (categórica):", options=colunas_categoricas)
+            y_col = st.selectbox("Selecione a coluna para valores (numérica):", options=colunas_numericas)
+
+            top_n_df = filtered_df.nlargest(max_categorias, y_col)
+
+            if categoria_especifica and municipio_selecionado:
+                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
+                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
+
+            display_graphs(top_n_df, x_col, y_col, 'Pizza')
+
+        if 'Linha' in grafico_selecionado:
+            x_col = st.selectbox("Selecione a coluna X (Ano ou categórica):", options=['Ano'])
+            y_col = st.selectbox("Selecione a coluna Y (numérica):", options=colunas_numericas)
+            display_graphs(filtered_df, x_col, y_col, 'Linha')
+
+        if 'Mapa' in grafico_selecionado:
+            display_map(filtered_df)
+
+def main():
+    """Função principal para exibir a aplicação Streamlit."""
+    st.title("Análise de Dados Populacionais")
+    menu = st.sidebar.selectbox("Menu", ["Carregar Dados", "Estatísticas", "Visualização"])
+
+    if menu == "Carregar Dados":
+        carregar_dados()
     elif menu == "Estatísticas":
-        st.subheader("Estatísticas Descritivas")
-        if 'df' in st.session_state:
-            df = st.session_state.df
-
-            if df is not None and df.empty:
-                st.write("Nenhum dado disponível.")
-            else:
-                st.sidebar.header("Filtros para Estatísticas")
-                
-                anos_disponiveis = df['Ano'].unique()
-                estados_disponiveis = df['Estados'].unique()
-                regioes_disponiveis = df['Regiões'].unique()
-
-                ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", options=sorted(anos_disponiveis, reverse=True), index=0)
-                estado = st.sidebar.selectbox("Estado (opcional)", options=["Todos"] + sorted(estados_disponiveis))
-                regiao = st.sidebar.selectbox("Região (opcional)", options=["Todas"] + sorted(regioes_disponiveis))
-
-                filtered_df = df[
-                    (df['Ano'] == ano_pesquisa) & 
-                    ((df['Estados'] == estado) if estado != "Todos" else True) &
-                    ((df['Regiões'] == regiao) if regiao != "Todas" else True)
-                ]
-
-                if not filtered_df.empty:
-                    st.write("Estatísticas Descritivas para População:")
-                    estatisticas = filtered_df['População'].describe()
-                    st.write(estatisticas)
-                else:
-                    st.write("Nenhum dado disponível para os filtros selecionados.")
-        else:
-            st.write("Carregue os dados na seção 'Carregar Dados'.")
-
+        exibir_estatisticas()
     elif menu == "Visualização":
-        st.subheader("Visualização de Dados")
-
-        if 'df' in st.session_state:
-            df = st.session_state.df
-
-            if df is not None and df.empty:
-                st.write("Nenhum dado disponível.")
-            else:
-                st.sidebar.header("Filtros")
-
-                anos_disponiveis = df['Ano'].unique()
-                estados_disponiveis = df['Estados'].unique()
-                regioes_disponiveis = df['Regiões'].unique()
-
-                ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", options=sorted(anos_disponiveis, reverse=True), index=0)
-                estado = st.sidebar.selectbox("Estado", options=["Todos"] + sorted(estados_disponiveis))
-                regiao = st.sidebar.selectbox("Região", options=["Todas"] + sorted(regioes_disponiveis))
-
-                filtered_df = df[
-                    (df['Ano'] == ano_pesquisa) & 
-                    ((df['Estados'] == estado) if estado != "Todos" else True) &
-                    ((df['Regiões'] == regiao) if regiao != "Todas" else True)
-                ]
-
-                grafico_selecionado = st.sidebar.multiselect(
-                    "Escolha os gráficos para exibir:",
-                    ["Barra", "Pizza", "Linha", "Mapa"],
-                    default=["Barra", "Pizza", "Linha", "Mapa"]
-                )
-
-                st.write("### Selecione as Colunas para os Gráficos")
-                col1, col2, col3 = st.columns([1, 2, 1])
-
-                with col2:
-                    x_col = st.selectbox("Selecione a coluna X:", options=filtered_df.columns)
-                    y_col = st.selectbox("Selecione a coluna Y:", options=filtered_df.columns)
-
-                display_graphs(filtered_df, x_col, y_col, grafico_selecionado)
-                
-                if 'Mapa' in grafico_selecionado:
-                    display_map(filtered_df)
-        else:
-            st.write("Carregue os dados na seção 'Carregar Dados'.")
+        exibir_visualizacao()
 
 if __name__ == "__main__":
     main()
