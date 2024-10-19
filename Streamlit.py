@@ -25,12 +25,7 @@ def load_data():
 
         cur = conexao.cursor()
         st.write("Conexão estabelecida com sucesso.")
-        
-    except KeyError as e:
-        st.error(f"Chave de configuração faltando: {e}")
-    except Exception as e:
-        st.error(f"Erro ao conectar ao banco de dados: {e}")
-        
+
         query = """
         SELECT 
             p.ano_pesquisa, 
@@ -79,20 +74,20 @@ def load_data():
 
         return df
 
+    except KeyError as e:
+        st.error(f"Chave de configuração faltando: {e}")
+        return pd.DataFrame()  # Retornar DataFrame vazio em caso de exceção
+
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame()  # Retornar DataFrame vazio em caso de exceção
 
-
-    except Exception as e:
-        st.error(f"Erro ao conectar ao banco de dados: {e}")
-        return pd.DataFrame()
 
 def display_graphs(df, x_col, y_col, grafico_selecionado):
     """
     Exibe gráficos com base nas colunas e tipo de gráfico selecionado.
     """
-    if not df.empty:
+    if df is not None and not df.empty:  # Adiciona verificação se o df não é None
         if 'Barra' in grafico_selecionado:
             fig1 = px.bar(df, x=x_col, y=y_col, color='Estados', barmode='group',
                           title=f'{y_col} por {x_col}')
@@ -118,7 +113,7 @@ def display_map(df):
     Exibe o mapa de população por município.
     """
     st.subheader("Mapa de População por Município")
-    if not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:
+    if df is not None and not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:  # Adiciona verificação se o df não é None
         mapa_fig = px.scatter_mapbox(df, lat="Latitude", lon="Longitude", size="População",
                                      color="Estados", hover_name="Município",
                                      title="Distribuição Populacional",
@@ -140,7 +135,7 @@ def main():
         
         df = load_data()
 
-        if df.empty:
+        if df is not None and df.empty:
             st.write("Nenhum dado disponível.")
         else:
             st.write("Visualização das primeiras linhas do DataFrame:")
@@ -152,7 +147,7 @@ def main():
         if 'df' in st.session_state:
             df = st.session_state.df
 
-            if df.empty:
+            if df is not None and df.empty:
                 st.write("Nenhum dado disponível.")
             else:
                 st.sidebar.header("Filtros para Estatísticas")
@@ -186,7 +181,7 @@ def main():
         if 'df' in st.session_state:
             df = st.session_state.df
 
-            if df.empty:
+            if df is not None and df.empty:
                 st.write("Nenhum dado disponível.")
             else:
                 st.sidebar.header("Filtros")
