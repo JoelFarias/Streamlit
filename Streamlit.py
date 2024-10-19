@@ -25,7 +25,12 @@ def load_data():
 
         cur = conexao.cursor()
         st.write("Conexão estabelecida com sucesso.")
-
+        
+    except KeyError as e:
+        st.error(f"Chave de configuração faltando: {e}")
+    except Exception as e:
+        st.error(f"Erro ao conectar ao banco de dados: {e}")
+        
         query = """
         SELECT 
             p.ano_pesquisa, 
