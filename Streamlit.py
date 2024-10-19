@@ -153,31 +153,65 @@ def exibir_visualizacao():
     """Exibe gráficos e mapas de acordo com os filtros aplicados."""
     df = get_dataframe()
     if df is not None:
-        ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
-        estado = st.sidebar.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
-        regiao = st.sidebar.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+        ano_pesquisa = st.sidebar.selectbox(
+            "Ano da Pesquisa", 
+            sorted(df['Ano'].unique(), reverse=True), 
+            key="ano_pesquisa"
+        )
+        estado = st.sidebar.selectbox(
+            "Estado", 
+            ["Todos"] + sorted(df['Estados'].unique()), 
+            key="estado"
+        )
+        regiao = st.sidebar.selectbox(
+            "Região", 
+            ["Todas"] + sorted(df['Regiões'].unique()), 
+            key="regiao"
+        )
         filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
 
-        grafico_selecionado = st.sidebar.multiselect("Escolha os gráficos para exibir:", ["Barra", "Pizza", "Linha", "Mapa"])
+        grafico_selecionado = st.sidebar.multiselect(
+            "Escolha os gráficos para exibir:", 
+            ["Barra", "Pizza", "Linha", "Mapa"], 
+            key="grafico_selecionado"
+        )
 
         colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
         colunas_numericas = ['População']
 
         if 'Pizza' in grafico_selecionado or 'Barra' in grafico_selecionado:
-            max_categorias = st.sidebar.slider("Número máximo de categorias a exibir", min_value=5, max_value=20, value=10)
-            categoria_especifica = st.sidebar.text_input("Buscar uma categoria específica (Município)", "")
+            max_categorias = st.sidebar.slider(
+                "Número máximo de categorias a exibir", 
+                min_value=5, max_value=20, value=10, 
+                key="max_categorias"
+            )
+            categoria_especifica = st.sidebar.text_input(
+                "Buscar uma categoria específica (Município)", 
+                "", key="categoria_especifica"
+            )
 
             if categoria_especifica:
                 sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
                 st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
                 
-                municipio_selecionado = st.sidebar.selectbox("Selecione um município sugerido", sugestoes)
+                municipio_selecionado = st.sidebar.selectbox(
+                    "Selecione um município sugerido", 
+                    sugestoes, key="municipio_selecionado"
+                )
                 categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
                 df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
 
         if 'Barra' in grafico_selecionado:
-            x_col = st.selectbox("Selecione a coluna X (categórica):", options=colunas_categoricas)
-            y_col = st.selectbox("Selecione a coluna Y (numérica):", options=colunas_numericas)
+            x_col = st.selectbox(
+                "Selecione a coluna X (categórica):", 
+                options=colunas_categoricas, 
+                key="barra_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna Y (numérica):", 
+                options=colunas_numericas, 
+                key="barra_y_col"
+            )
 
             top_n_df = filtered_df.nlargest(max_categorias, y_col)
 
@@ -188,8 +222,16 @@ def exibir_visualizacao():
             display_graphs(top_n_df, x_col, y_col, 'Barra')
 
         if 'Pizza' in grafico_selecionado:
-            x_col = st.selectbox("Selecione a coluna para as fatias (categórica):", options=colunas_categoricas)
-            y_col = st.selectbox("Selecione a coluna para valores (numérica):", options=colunas_numericas)
+            x_col = st.selectbox(
+                "Selecione a coluna para as fatias (categórica):", 
+                options=colunas_categoricas, 
+                key="pizza_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna para valores (numérica):", 
+                options=colunas_numericas, 
+                key="pizza_y_col"
+            )
 
             top_n_df = filtered_df.nlargest(max_categorias, y_col)
 
@@ -200,13 +242,21 @@ def exibir_visualizacao():
             display_graphs(top_n_df, x_col, y_col, 'Pizza')
 
         if 'Linha' in grafico_selecionado:
-            x_col = st.selectbox("Selecione a coluna X (Ano ou categórica):", options=['Ano'])
-            y_col = st.selectbox("Selecione a coluna Y (numérica):", options=colunas_numericas)
+            x_col = st.selectbox(
+                "Selecione a coluna X (Ano ou categórica):", 
+                options=['Ano'], 
+                key="linha_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna Y (numérica):", 
+                options=colunas_numericas, 
+                key="linha_y_col"
+            )
             display_graphs(filtered_df, x_col, y_col, 'Linha')
 
         if 'Mapa' in grafico_selecionado:
             display_map(filtered_df)
-
+            
 def main():
     """Função principal para exibir a aplicação Streamlit."""
     st.title("Análise de Dados Populacionais")
