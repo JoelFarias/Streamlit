@@ -1,8 +1,7 @@
 plotly
-unicodedata
 fuzzywuzzy
 psycopg2
 pandas
 streamlit
 streamlit-option-menu
-st-aggrid
+streamlit-aggrid
