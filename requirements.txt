@@ -1,6 +1,6 @@
 plotly
 fuzzywuzzy
-psycopg2
+psycopg2-binary
 pandas
 streamlit
 streamlit-option-menu
