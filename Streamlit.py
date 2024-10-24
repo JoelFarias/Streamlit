@@ -5,10 +5,11 @@ import os
 import psycopg2 as pg
 import pandas as pd
 import streamlit as st
+from streamlit_option_menu import option_menu
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 @st.cache_data(ttl=600)
 def load_data() -> pd.DataFrame | None:
-    """Carrega os dados do banco de dados e renomeia as colunas."""
     try:
         conn = pg.connect(
             host=st.secrets["DB_HOST"],
@@ -16,69 +17,53 @@ def load_data() -> pd.DataFrame | None:
             user=st.secrets["DB_USERNAME"],
             password=st.secrets["DB_PASSWORD"]
         )
-        with conn.cursor() as cur:
-            query = """
-            SELECT 
-                p.ano_pesquisa, 
-                p.numero_habitantes, 
-                p.faixa_populacao, 
-                m.nome_municipio, 
-                u.nome_uf, 
-                r.nome_regiao, 
-                m.latitude, 
-                m.longitude 
-            FROM populacao p
-            JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
-            JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
-            JOIN regiao r ON u.cd_regiao = r.cd_regiao
-            """
-            cur.execute(query)
-            data = cur.fetchall()
-            colnames = [desc[0] for desc in cur.description]
-
-        df = pd.DataFrame(data, columns=colnames)
-
+        query = """
+        SELECT p.ano_pesquisa, p.numero_habitantes, p.faixa_populacao, 
+               m.nome_municipio, u.nome_uf, r.nome_regiao, 
+               m.latitude, m.longitude 
+        FROM populacao p
+        JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
+        JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
+        JOIN regiao r ON u.cd_regiao = r.cd_regiao
+        """
+        df = pd.read_sql(query, conn)
         mapeamento_colunas = {
-            'ano_pesquisa': 'Ano',
-            'numero_habitantes': 'População',
-            'faixa_populacao': 'Faixa de População',
-            'nome_municipio': 'Município',
-            'nome_uf': 'Estados',
-            'nome_regiao': 'Regiões',
-            'latitude': 'Latitude',
-            'longitude': 'Longitude'
+            'ano_pesquisa': 'Ano', 'numero_habitantes': 'População',
+            'faixa_populacao': 'Faixa de População', 'nome_municipio': 'Município',
+            'nome_uf': 'Estados', 'nome_regiao': 'Regiões',
+            'latitude': 'Latitude', 'longitude': 'Longitude'
         }
-        df = renomear_colunas(df, mapeamento_colunas)
+        df.rename(columns=mapeamento_colunas, inplace=True)
         df['Ano'] = df['Ano'].astype(str)
         df['População'] = pd.to_numeric(df['População'], errors='coerce')
-
         return df
-
     except (pg.Error, Exception) as e:
-        st.error(f"Erro ao carregar os dados: {e}")
+        st.error(f"Erro ao carregar dados: {e}")
         return None
-    finally:
-        if conn:
-            conn.close()
-
-def get_dataframe() -> pd.DataFrame | None:
-    """Recupera o DataFrame armazenado na sessão."""
-    return st.session_state.get('df', None)
-
-def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
-    """Renomeia as colunas de um DataFrame."""
-    return df.rename(columns=mapeamento_colunas)
 
 def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
-    """Filtra os dados com base nos parâmetros fornecidos."""
     return df[
         (df['Ano'] == ano) &
         ((df['Estados'] == estado) if estado != "Todos" else True) &
         ((df['Regiões'] == regiao) if regiao != "Todas" else True)
     ]
 
+def get_dataframe() -> pd.DataFrame | None:
+    return st.session_state.get('df', None)
+
+def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
+    return df.rename(columns=mapeamento_colunas)
+
+def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
+    municipios = df['Município'].unique()
+    municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
+
+    municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
+    sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
+
+    return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
+
 def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
-    """Exibe gráficos com base na seleção."""
     if df.empty:
         st.warning("Nenhum dado disponível para os filtros selecionados.")
         return
@@ -99,7 +84,6 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
         st.error(f"Erro ao exibir o gráfico: {e}")
 
 def display_map(df: pd.DataFrame):
-    """Exibe o mapa de população por município."""
     if df.empty or 'Latitude' not in df.columns or 'Longitude' not in df.columns:
         st.write("Dados de latitude e longitude não disponíveis.")
         return
@@ -112,15 +96,14 @@ def display_map(df: pd.DataFrame):
     st.plotly_chart(mapa_fig)
 
 def carregar_dados():
-    """Carrega e exibe os dados na interface."""
     with st.spinner('Carregando dados...'):
-        df = load_data()
+        df = load_data()  
         if df is not None:
+            st.success("Dados carregados com sucesso!") 
             st.dataframe(df.head())
             st.session_state.df = df
 
 def exibir_estatisticas():
-    """Exibe as estatísticas com base nos filtros de ano, estado e região."""
     df = get_dataframe()
     if df is not None:
         ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
@@ -128,19 +111,45 @@ def exibir_estatisticas():
         regiao = st.sidebar.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
 
         filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+
         if not filtered_df.empty:
-            st.write("Estatísticas Descritivas para População:")
-            st.write(filtered_df['População'].describe())
+            stats = filtered_df['População'].describe().reset_index()
+            
+            stats.columns = ["Métrica", "População"]
+            translate = {
+                "count": "Quantidade de Municípios",
+                "mean": "Média da População por Município",
+                "std": "Desvio Padrão",
+                "min": "Município com a menor População",
+                "25%": "1º Quartil (25%)",
+                "50%": "Mediana (50%)",
+                "75%": "3º Quartil (75%)",
+                "max": "Município com a maior População"
+            }
+            stats['Métrica'] = stats['Métrica'].map(translate)
+
+            gb = GridOptionsBuilder.from_dataframe(stats)
+            gb.configure_column("Métrica", header_name="Métrica", width=200)
+            gb.configure_column("População", header_name="Valor", width=200)
+            grid_options = gb.build()
+
+            st.write("### Estatísticas Descritivas da População:")
+            AgGrid(
+                stats,
+                gridOptions=grid_options,
+                height=300,
+                fit_columns_on_grid_load=True
+            )
+        else:
+            st.warning("Nenhum dado encontrado para os filtros selecionados.")
 
 def remover_acentos_e_lower(texto: str) -> str:
-    """Remove acentos e converte o texto para minúsculas."""
     return ''.join(
         c for c in unicodedata.normalize('NFD', texto)
         if unicodedata.category(c) != 'Mn'
     ).lower()
 
 def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
-    """Sugere municípios com base no nome digitado pelo usuário."""
     municipios = df['Município'].unique()
     municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
 
@@ -150,7 +159,6 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
 def exibir_visualizacao():
-    """Exibe gráficos e mapas de acordo com os filtros aplicados."""
     df = get_dataframe()
     if df is not None:
         ano_pesquisa = st.sidebar.selectbox(
@@ -179,27 +187,26 @@ def exibir_visualizacao():
         colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
         colunas_numericas = ['População']
 
-        if 'Pizza' in grafico_selecionado or 'Barra' in grafico_selecionado:
-            max_categorias = st.sidebar.slider(
-                "Número máximo de categorias a exibir", 
-                min_value=5, max_value=20, value=10, 
-                key="max_categorias"
-            )
-            categoria_especifica = st.sidebar.text_input(
-                "Buscar uma categoria específica (Município)", 
-                "", key="categoria_especifica"
-            )
+        max_categorias = st.sidebar.slider(
+            "Número máximo de categorias a exibir", 
+            min_value=5, max_value=20, value=10, 
+            key="max_categorias"
+        )
+        categoria_especifica = st.sidebar.text_input(
+            "Buscar uma categoria específica (Município)", 
+            "", key="categoria_especifica"
+        )
 
-            if categoria_especifica:
-                sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
-                st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
-                
-                municipio_selecionado = st.sidebar.selectbox(
-                    "Selecione um município sugerido", 
-                    sugestoes, key="municipio_selecionado"
-                )
-                categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
-                df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
+        if categoria_especifica:
+            sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
+            st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
+            
+            municipio_selecionado = st.sidebar.selectbox(
+                "Selecione um município sugerido", 
+                sugestoes, key="municipio_selecionado"
+            )
+            categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
+            df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
 
         if 'Barra' in grafico_selecionado:
             x_col = st.selectbox(
@@ -253,14 +260,119 @@ def exibir_visualizacao():
                 key="linha_y_col"
             )
             display_graphs(filtered_df, x_col, y_col, 'Linha')
+        
+def css():
+    st.markdown(
+        """
+        <style>
+        /* Suporte a temas claro e escuro */
+        body {
+            font-family: Arial, sans-serif;
+        }
 
-        if 'Mapa' in grafico_selecionado:
-            display_map(filtered_df)
-            
+        /* Modo Claro */
+        @media (prefers-color-scheme: light) {
+            body {
+                background-color: #ffffff;
+                color: #000000;
+            }
+
+            h1 {
+                color: #333333;
+            }
+
+            .sidebar .sidebar-content {
+                background-color: #f0f0f0;
+            }
+
+            .menu li a {
+                background-color: #e0e0e0;
+                color: black;
+            }
+
+            .menu li a:hover {
+                background-color: #ffcccb;
+            }
+
+            .table-container table {
+                background-color: #ffffff;
+                border-color: #cccccc;
+            }
+
+            th {
+                background-color: #f5f5f5;
+            }
+
+            td {
+                background-color: #ffffff;
+            }
+        }
+
+        /* Modo Escuro */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1d1d1d;
+                color: #ffffff;
+            }
+
+            h1 {
+                color: #f5f5f5;
+            }
+
+            .sidebar .sidebar-content {
+                background-color: #2c2c2c;
+            }
+
+            .menu li a {
+                background-color: #444;
+                color: white;
+            }
+
+            .menu li a:hover {
+                background-color: #e63946;
+            }
+
+            .table-container table {
+                background-color: #2c2c2c;
+                border-color: #444;
+            }
+
+            th {
+                background-color: #444;
+            }
+
+            td {
+                background-color: #333;
+            }
+        }
+        </style>
+        """, 
+        unsafe_allow_html=True
+    )
+
 def main():
-    """Função principal para exibir a aplicação Streamlit."""
-    st.title("Análise de Dados Populacionais")
-    menu = st.sidebar.selectbox("Menu", ["Carregar Dados", "Estatísticas", "Visualização"])
+
+    css() 
+    st.markdown("<h1>Análise de Dados Populacionais</h1>", unsafe_allow_html=True)
+
+    menu = option_menu(
+        menu_title="Menu",
+        options=["Carregar Dados", "Estatísticas", "Visualização"],
+        icons=["cloud-upload", "bar-chart", "eye"],
+        menu_icon="cast",
+        default_index=0,
+        orientation="vertical",
+        styles={
+            "container": {"padding": "5px", "background-color": "#f0f2f6"},
+            "icon": {"color": "orange", "font-size": "25px"},
+            "nav-link": {
+                "font-size": "16px", "text-align": "left",
+                "margin": "0px",
+                "--hover-color": "#eee",
+            },
+            "nav-link-selected": {"background-color": "#ff4b4b"},
+        }
+    )
 
     if menu == "Carregar Dados":
         carregar_dados()
