@@ -1,7 +1,8 @@
-plotly>=5.0.0
-unicodedata2
-fuzzywuzzy[speedup]>=0.18.0
-python-dotenv>=0.21.0
-psycopg2-binary>=2.9.0
-pandas>=1.3.0
-streamlit>=1.25.0
+plotly
+unicodedata
+fuzzywuzzy
+psycopg2
+pandas
+streamlit
+streamlit-option-menu
+st-aggrid
