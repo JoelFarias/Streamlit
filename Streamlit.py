@@ -183,7 +183,7 @@ def main():
     elif menu == "Visualização":
         df = get_dataframe()
         if df is not None:
-            display_map(df)  # Passa o DataFrame para display_map
+            display_map(df)
         else:
             st.warning("Por favor, carregue os dados primeiro.")
     
