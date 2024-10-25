@@ -79,7 +79,9 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             fig = px.pie(df, names=x_col, values=y_col, title=f'Distribuição de {y_col} por {x_col}')
         elif grafico == 'Linha':
             fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
-        st.plotly_chart(fig)
+            st.plotly_chart(fig)
+        elif gafico == 'Mapa':
+            display_map()
     except ValueError as e:
         st.error(f"Erro ao exibir o gráfico: {e}")
 
