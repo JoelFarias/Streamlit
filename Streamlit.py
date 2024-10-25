@@ -184,6 +184,8 @@ def main():
         carregar_dados()
     elif menu == "Estatísticas":
         exibir_estatisticas()
-
+    elif menu == "Visualização":
+        exibir_visualizacao()
+    
 if __name__ == "__main__":
     main()
