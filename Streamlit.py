@@ -82,10 +82,6 @@ def exibir_visualizacao(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             fig = px.pie(df, names=x_col, values=y_col, title=f'Distribuição de {y_col} por {x_col}')
         elif grafico == 'Linha':
             fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
-        elif grafico == 'Mapa':
-            display_map(df)
-            return
-
         st.plotly_chart(fig)
     except ValueError as e:
         st.error(f"Erro ao exibir o gráfico: {e}")
@@ -185,7 +181,7 @@ def main():
     elif menu == "Estatísticas":
         exibir_estatisticas()
     elif menu == "Visualização":
-        exibir_visualizacao()
+        display_map()
     
 if __name__ == "__main__":
     main()
