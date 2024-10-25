@@ -51,8 +51,11 @@ def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.Data
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
 
-def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
-    return df.rename(columns=mapeamento_colunas)
+def remover_acentos_e_lower(texto: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
 
 def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
     municipios = df['Município'].unique()
@@ -79,9 +82,11 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             fig = px.pie(df, names=x_col, values=y_col, title=f'Distribuição de {y_col} por {x_col}')
         elif grafico == 'Linha':
             fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
-            st.plotly_chart(fig)
-        elif gafico == 'Mapa':
-            display_map()
+        elif grafico == 'Mapa':
+            display_map(df)
+            return  # Avoid calling st.plotly_chart again for map
+
+        st.plotly_chart(fig)
     except ValueError as e:
         st.error(f"Erro ao exibir o gráfico: {e}")
 
@@ -116,7 +121,6 @@ def exibir_estatisticas():
 
         if not filtered_df.empty:
             stats = filtered_df['População'].describe().reset_index()
-            
             stats.columns = ["Métrica", "População"]
             translate = {
                 "count": "Quantidade de Municípios",
@@ -145,207 +149,18 @@ def exibir_estatisticas():
         else:
             st.warning("Nenhum dado encontrado para os filtros selecionados.")
 
-def remover_acentos_e_lower(texto: str) -> str:
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', texto)
-        if unicodedata.category(c) != 'Mn'
-    ).lower()
-
-def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
-    municipios = df['Município'].unique()
-    municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
-
-    municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
-    sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
-
-    return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
-
-def exibir_visualizacao():
-    df = get_dataframe()
-    if df is not None:
-        ano_pesquisa = st.sidebar.selectbox(
-            "Ano da Pesquisa", 
-            sorted(df['Ano'].unique(), reverse=True), 
-            key="ano_pesquisa"
-        )
-        estado = st.sidebar.selectbox(
-            "Estado", 
-            ["Todos"] + sorted(df['Estados'].unique()), 
-            key="estado"
-        )
-        regiao = st.sidebar.selectbox(
-            "Região", 
-            ["Todas"] + sorted(df['Regiões'].unique()), 
-            key="regiao"
-        )
-        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
-
-        grafico_selecionado = st.sidebar.multiselect(
-            "Escolha os gráficos para exibir:", 
-            ["Barra", "Pizza", "Linha", "Mapa"], 
-            key="grafico_selecionado"
-        )
-
-        colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
-        colunas_numericas = ['População']
-
-        max_categorias = st.sidebar.slider(
-            "Número máximo de categorias a exibir", 
-            min_value=5, max_value=20, value=10, 
-            key="max_categorias"
-        )
-        categoria_especifica = st.sidebar.text_input(
-            "Buscar uma categoria específica (Município)", 
-            "", key="categoria_especifica"
-        )
-
-        if categoria_especifica:
-            sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
-            st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
-            
-            municipio_selecionado = st.sidebar.selectbox(
-                "Selecione um município sugerido", 
-                sugestoes, key="municipio_selecionado"
-            )
-            categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
-            df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
-
-        if 'Barra' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna X (categórica):", 
-                options=colunas_categoricas, 
-                key="barra_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna Y (numérica):", 
-                options=colunas_numericas, 
-                key="barra_y_col"
-            )
-
-            top_n_df = filtered_df.nlargest(max_categorias, y_col)
-
-            if categoria_especifica and municipio_selecionado:
-                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
-                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
-
-            display_graphs(top_n_df, x_col, y_col, 'Barra')
-
-        if 'Pizza' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna para as fatias (categórica):", 
-                options=colunas_categoricas, 
-                key="pizza_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna para valores (numérica):", 
-                options=colunas_numericas, 
-                key="pizza_y_col"
-            )
-
-            top_n_df = filtered_df.nlargest(max_categorias, y_col)
-
-            if categoria_especifica and municipio_selecionado:
-                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
-                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
-
-            display_graphs(top_n_df, x_col, y_col, 'Pizza')
-
-        if 'Linha' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna X (Ano ou categórica):", 
-                options=['Ano'], 
-                key="linha_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna Y (numérica):", 
-                options=colunas_numericas, 
-                key="linha_y_col"
-            )
-            display_graphs(filtered_df, x_col, y_col, 'Linha')
-        
 def css():
     st.markdown(
         """
         <style>
-        /* Suporte a temas claro e escuro */
-        body {
-            font-family: Arial, sans-serif;
-        }
-
-        /* Modo Claro */
+        body { font-family: Arial, sans-serif; }
         @media (prefers-color-scheme: light) {
-            body {
-                background-color: #ffffff;
-                color: #000000;
-            }
-
-            h1 {
-                color: #333333;
-            }
-
-            .sidebar .sidebar-content {
-                background-color: #f0f0f0;
-            }
-
-            .menu li a {
-                background-color: #e0e0e0;
-                color: black;
-            }
-
-            .menu li a:hover {
-                background-color: #ffcccb;
-            }
-
-            .table-container table {
-                background-color: #ffffff;
-                border-color: #cccccc;
-            }
-
-            th {
-                background-color: #f5f5f5;
-            }
-
-            td {
-                background-color: #ffffff;
-            }
+            body { background-color: #ffffff; color: #000000; }
+            .sidebar .sidebar-content { background-color: #f0f0f0; }
         }
-
-        /* Modo Escuro */
         @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #1d1d1d;
-                color: #ffffff;
-            }
-
-            h1 {
-                color: #f5f5f5;
-            }
-
-            .sidebar .sidebar-content {
-                background-color: #2c2c2c;
-            }
-
-            .menu li a {
-                background-color: #444;
-                color: white;
-            }
-
-            .menu li a:hover {
-                background-color: #e63946;
-            }
-
-            .table-container table {
-                background-color: #2c2c2c;
-                border-color: #444;
-            }
-
-            th {
-                background-color: #444;
-            }
-
-            td {
-                background-color: #333;
-            }
+            body { background-color: #1d1d1d; color: #ffffff; }
+            .sidebar .sidebar-content { background-color: #2c2c2c; }
         }
         </style>
         """, 
@@ -353,7 +168,6 @@ def css():
     )
 
 def main():
-
     css() 
     st.markdown("<h1>Análise de Dados Populacionais</h1>", unsafe_allow_html=True)
 
@@ -364,24 +178,12 @@ def main():
         menu_icon="cast",
         default_index=0,
         orientation="vertical",
-        styles={
-            "container": {"padding": "5px", "background-color": "#f0f2f6"},
-            "icon": {"color": "orange", "font-size": "25px"},
-            "nav-link": {
-                "font-size": "16px", "text-align": "left",
-                "margin": "0px",
-                "--hover-color": "#eee",
-            },
-            "nav-link-selected": {"background-color": "#ff4b4b"},
-        }
     )
 
     if menu == "Carregar Dados":
         carregar_dados()
     elif menu == "Estatísticas":
         exibir_estatisticas()
-    elif menu == "Visualização":
-        exibir_visualizacao()
 
 if __name__ == "__main__":
     main()
