@@ -181,7 +181,11 @@ def main():
     elif menu == "Estatísticas":
         exibir_estatisticas()
     elif menu == "Visualização":
-        display_map(df)
+        df = get_dataframe()
+        if df is not None:
+            display_map(df)  # Passa o DataFrame para display_map
+        else:
+            st.warning("Por favor, carregue os dados primeiro.")
     
 if __name__ == "__main__":
     main()
