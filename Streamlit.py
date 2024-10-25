@@ -66,7 +66,7 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
 
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
-def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
+def exibir_visualizacao(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
     if df.empty:
         st.warning("Nenhum dado disponível para os filtros selecionados.")
         return
@@ -84,7 +84,7 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
         elif grafico == 'Mapa':
             display_map(df)
-            return  # Avoid calling st.plotly_chart again for map
+            return
 
         st.plotly_chart(fig)
     except ValueError as e:
