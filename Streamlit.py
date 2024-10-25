@@ -181,7 +181,7 @@ def main():
     elif menu == "Estatísticas":
         exibir_estatisticas()
     elif menu == "Visualização":
-        display_map()
+        display_map(df)
     
 if __name__ == "__main__":
     main()
