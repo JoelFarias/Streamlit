@@ -12,10 +12,10 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 def load_data() -> pd.DataFrame | None:
     try:
         conn = pg.connect(
-            host=st.secrets["DB_HOST"],
-            database=st.secrets["DB_NAME"],
-            user=st.secrets["DB_USERNAME"],
-            password=st.secrets["DB_PASSWORD"]
+            database=os.getenv("DB_NAME", "Data_IESB"),
+            user=os.getenv("DB_USER", "Data_IESB"),
+            password=os.getenv("DB_PASS", "DATA_IESB"),
+            host=os.getenv("DB_HOST", "dataiesb.iesbtech.com.br")
         )
         query = """
         SELECT p.ano_pesquisa, p.numero_habitantes, p.faixa_populacao, 
@@ -95,7 +95,7 @@ def display_map(df: pd.DataFrame):
         mapbox_style="carto-positron", zoom=3
     )
     st.plotly_chart(mapa_fig)
-    
+
 def carregar_dados():
     with st.spinner('Carregando dados...'):
         df = load_data()  
@@ -159,7 +159,6 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
 
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
-# Alteração na função `exibir_visualizacao` para permitir selecionar gráficos e só exibir o mapa quando selecionado
 def exibir_visualizacao():
     df = get_dataframe()
     if df is not None:
@@ -262,23 +261,91 @@ def exibir_visualizacao():
                 key="linha_y_col"
             )
             display_graphs(filtered_df, x_col, y_col, 'Linha')
-            
         if 'Mapa' in grafico_selecionado:
-            display_map(filtered_df)
-
-        
+            display_map(df)
 def css():
     st.markdown(
         """
         <style>
-        body { font-family: Arial, sans-serif; }
-        @media (prefers-color-scheme: light) {
-            body { background-color: #ffffff; color: #000000; }
-            .sidebar .sidebar-content { background-color: #f0f0f0; }
+        /* Suporte a temas claro e escuro */
+        body {
+            font-family: Arial, sans-serif;
         }
+
+        /* Modo Claro */
+        @media (prefers-color-scheme: light) {
+            body {
+                background-color: #ffffff;
+                color: #000000;
+            }
+
+            h1 {
+                color: #333333;
+            }
+
+            .sidebar .sidebar-content {
+                background-color: #f0f0f0;
+            }
+
+            .menu li a {
+                background-color: #e0e0e0;
+                color: black;
+            }
+
+            .menu li a:hover {
+                background-color: #ffcccb;
+            }
+
+            .table-container table {
+                background-color: #ffffff;
+                border-color: #cccccc;
+            }
+
+            th {
+                background-color: #f5f5f5;
+            }
+
+            td {
+                background-color: #ffffff;
+            }
+        }
+
+        /* Modo Escuro */
         @media (prefers-color-scheme: dark) {
-            body { background-color: #1d1d1d; color: #ffffff; }
-            .sidebar .sidebar-content { background-color: #2c2c2c; }
+            body {
+                background-color: #1d1d1d;
+                color: #ffffff;
+            }
+
+            h1 {
+                color: #f5f5f5;
+            }
+
+            .sidebar .sidebar-content {
+                background-color: #2c2c2c;
+            }
+
+            .menu li a {
+                background-color: #444;
+                color: white;
+            }
+
+            .menu li a:hover {
+                background-color: #e63946;
+            }
+
+            .table-container table {
+                background-color: #2c2c2c;
+                border-color: #444;
+            }
+
+            th {
+                background-color: #444;
+            }
+
+            td {
+                background-color: #333;
+            }
         }
         </style>
         """, 
@@ -286,6 +353,7 @@ def css():
     )
 
 def main():
+
     css() 
     st.markdown("<h1>Análise de Dados Populacionais</h1>", unsafe_allow_html=True)
 
@@ -296,6 +364,16 @@ def main():
         menu_icon="cast",
         default_index=0,
         orientation="vertical",
+        styles={
+            "container": {"padding": "5px", "background-color": "#f0f2f6"},
+            "icon": {"color": "orange", "font-size": "25px"},
+            "nav-link": {
+                "font-size": "16px", "text-align": "left",
+                "margin": "0px",
+                "--hover-color": "#eee",
+            },
+            "nav-link-selected": {"background-color": "#ff4b4b"},
+        }
     )
 
     if menu == "Carregar Dados":
@@ -303,11 +381,7 @@ def main():
     elif menu == "Estatísticas":
         exibir_estatisticas()
     elif menu == "Visualização":
-        df = get_dataframe()
-        if df is not None:
-            display_map(df)
-        else:
-            st.warning("Por favor, carregue os dados primeiro.")
-    
+        exibir_visualizacao()
+
 if __name__ == "__main__":
     main()
