@@ -42,6 +42,7 @@ def load_data() -> pd.DataFrame | None:
         return None
 
 def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
+    """Filtra os dados de acordo com ano, estado e região."""
     return df[
         (df['Ano'] == ano) &
         ((df['Estados'] == estado) if estado != "Todos" else True) &
@@ -51,11 +52,8 @@ def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.Data
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
 
-def remover_acentos_e_lower(texto: str) -> str:
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', texto)
-        if unicodedata.category(c) != 'Mn'
-    ).lower()
+def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
+    return df.rename(columns=mapeamento_colunas)
 
 def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
     municipios = df['Município'].unique()
@@ -66,7 +64,7 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
 
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
-def exibir_visualizacao(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
+def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
     if df.empty:
         st.warning("Nenhum dado disponível para os filtros selecionados.")
         return
@@ -97,7 +95,7 @@ def display_map(df: pd.DataFrame):
         mapbox_style="carto-positron", zoom=3
     )
     st.plotly_chart(mapa_fig)
-
+    
 def carregar_dados():
     with st.spinner('Carregando dados...'):
         df = load_data()  
@@ -117,6 +115,7 @@ def exibir_estatisticas():
 
         if not filtered_df.empty:
             stats = filtered_df['População'].describe().reset_index()
+            
             stats.columns = ["Métrica", "População"]
             translate = {
                 "count": "Quantidade de Municípios",
@@ -145,6 +144,124 @@ def exibir_estatisticas():
         else:
             st.warning("Nenhum dado encontrado para os filtros selecionados.")
 
+def remover_acentos_e_lower(texto: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    ).lower()
+
+def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
+    municipios = df['Município'].unique()
+    municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
+
+    municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
+    sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
+
+    return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
+
+def exibir_visualizacao():
+    df = get_dataframe()
+    if df is not None:
+        ano_pesquisa = st.sidebar.selectbox(
+            "Ano da Pesquisa", 
+            sorted(df['Ano'].unique(), reverse=True), 
+            key="ano_pesquisa"
+        )
+        estado = st.sidebar.selectbox(
+            "Estado", 
+            ["Todos"] + sorted(df['Estados'].unique()), 
+            key="estado"
+        )
+        regiao = st.sidebar.selectbox(
+            "Região", 
+            ["Todas"] + sorted(df['Regiões'].unique()), 
+            key="regiao"
+        )
+        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+
+        grafico_selecionado = st.sidebar.multiselect(
+            "Escolha os gráficos para exibir:", 
+            ["Barra", "Pizza", "Linha", "Mapa"], 
+            key="grafico_selecionado"
+        )
+
+        colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
+        colunas_numericas = ['População']
+
+        max_categorias = st.sidebar.slider(
+            "Número máximo de categorias a exibir", 
+            min_value=5, max_value=20, value=10, 
+            key="max_categorias"
+        )
+        categoria_especifica = st.sidebar.text_input(
+            "Buscar uma categoria específica (Município)", 
+            "", key="categoria_especifica"
+        )
+
+        if categoria_especifica:
+            sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
+            st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
+            
+            municipio_selecionado = st.sidebar.selectbox(
+                "Selecione um município sugerido", 
+                sugestoes, key="municipio_selecionado"
+            )
+            categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
+            df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
+
+        if 'Barra' in grafico_selecionado:
+            x_col = st.selectbox(
+                "Selecione a coluna X (categórica):", 
+                options=colunas_categoricas, 
+                key="barra_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna Y (numérica):", 
+                options=colunas_numericas, 
+                key="barra_y_col"
+            )
+
+            top_n_df = filtered_df.nlargest(max_categorias, y_col)
+
+            if categoria_especifica and municipio_selecionado:
+                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
+                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
+
+            display_graphs(top_n_df, x_col, y_col, 'Barra')
+
+        if 'Pizza' in grafico_selecionado:
+            x_col = st.selectbox(
+                "Selecione a coluna para as fatias (categórica):", 
+                options=colunas_categoricas, 
+                key="pizza_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna para valores (numérica):", 
+                options=colunas_numericas, 
+                key="pizza_y_col"
+            )
+
+            top_n_df = filtered_df.nlargest(max_categorias, y_col)
+
+            if categoria_especifica and municipio_selecionado:
+                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
+                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
+
+            display_graphs(top_n_df, x_col, y_col, 'Pizza')
+
+        if 'Linha' in grafico_selecionado:
+            x_col = st.selectbox(
+                "Selecione a coluna X (Ano ou categórica):", 
+                options=['Ano'], 
+                key="linha_x_col"
+            )
+            y_col = st.selectbox(
+                "Selecione a coluna Y (numérica):", 
+                options=colunas_numericas, 
+                key="linha_y_col"
+            )
+            display_graphs(filtered_df, x_col, y_col, 'Linha')
+        
 def css():
     st.markdown(
         """
