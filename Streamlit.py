@@ -159,6 +159,7 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
 
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
+# Alteração na função `exibir_visualizacao` para permitir selecionar gráficos e só exibir o mapa quando selecionado
 def exibir_visualizacao():
     df = get_dataframe()
     if df is not None:
@@ -261,6 +262,10 @@ def exibir_visualizacao():
                 key="linha_y_col"
             )
             display_graphs(filtered_df, x_col, y_col, 'Linha')
+            
+        if 'Mapa' in grafico_selecionado:
+            display_map(filtered_df)
+
         
 def css():
     st.markdown(
