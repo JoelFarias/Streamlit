@@ -12,10 +12,10 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 def load_data() -> pd.DataFrame | None:
     try:
         conn = pg.connect(
-            database=os.getenv("DB_NAME", "Data_IESB"),
-            user=os.getenv("DB_USER", "Data_IESB"),
-            password=os.getenv("DB_PASS", "DATA_IESB"),
-            host=os.getenv("DB_HOST", "dataiesb.iesbtech.com.br")
+            host=st.secrets["DB_HOST"],
+            database=st.secrets["DB_NAME"],
+            user=st.secrets["DB_USERNAME"],
+            password=st.secrets["DB_PASSWORD"]
         )
         query = """
         SELECT p.ano_pesquisa, p.numero_habitantes, p.faixa_populacao, 
@@ -262,7 +262,7 @@ def exibir_visualizacao():
             )
             display_graphs(filtered_df, x_col, y_col, 'Linha')
         if 'Mapa' in grafico_selecionado:
-            display_map(df)
+            display_map(filtered_df)
 def css():
     st.markdown(
         """
