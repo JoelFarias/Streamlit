@@ -114,20 +114,18 @@ def exibir_estatisticas():
         filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
 
         if not filtered_df.empty:
-            stats_desc = filtered_df['População'].describe().to_dict()
+            min_pop = filtered_df.loc[filtered_df['População'].idxmin()]
+            max_pop = filtered_df.loc[filtered_df['População'].idxmax()]
             
-            idx_min = filtered_df['População'].idxmin()
-            idx_max = filtered_df['População'].idxmax()
-        
             stats_data = {
-                "count": ("Quantidade de Municípios", stats_desc['count']),
-                "mean": ("Média da População por Município", stats_desc['mean']),
-                "std": ("Desvio Padrão", stats_desc['std']),
-                "min": ("Município com a menor População", filtered_df.loc[idx_min, 'Município']),
-                "25%": ("1º Quartil (25%)", stats_desc['25%']),
-                "50%": ("Mediana (50%)", stats_desc['50%']),
-                "75%": ("3º Quartil (75%)", stats_desc['75%']),
-                "max": ("Município com a maior População", filtered_df.loc[idx_max, 'Município'])
+                "count": ("Quantidade de Municípios", f"{len(filtered_df):,}"),
+                "mean": ("Média Populacional", f"{filtered_df['População'].mean():,.2f}"),
+                "std": ("Desvio Padrão", f"{filtered_df['População'].std():,.2f}"),
+                "min": ("Menor População", f"{min_pop['Município']} ({min_pop['População']:,.0f} hab)"),
+                "25%": ("1º Quartil", f"{filtered_df['População'].quantile(0.25):,.0f}"),
+                "50%": ("Mediana", f"{filtered_df['População'].median():,.0f}"),
+                "75%": ("3º Quartil", f"{filtered_df['População'].quantile(0.75):,.0f}"),
+                "max": ("Maior População", f"{max_pop['Município']} ({max_pop['População']:,.0f} hab)")
             }
 
             stats = pd.DataFrame({
@@ -137,11 +135,11 @@ def exibir_estatisticas():
 
             gb = GridOptionsBuilder.from_dataframe(stats)
             gb.configure_column("Métrica", header_name="Métrica", width=250)
-            gb.configure_column("Valor", header_name="Valor", width=150, type=["numericColumn", "textColumn"])
+            gb.configure_column("Valor", header_name="Valor", width=300)
             grid_options = gb.build()
 
             st.write("### Estatísticas Descritivas da População:")
-            AgGrid(stats, gridOptions=grid_options, height=300, fit_columns_on_grid_load=False)
+            AgGrid(stats, gridOptions=grid_options, height=300)
 
         else:
             st.warning("Nenhum dado encontrado para os filtros selecionados.")
