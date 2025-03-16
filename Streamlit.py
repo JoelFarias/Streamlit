@@ -219,62 +219,55 @@ def carregar_dados():
             st.success("Dados carregados com sucesso!")
             st.dataframe(df.head(3))
 
-def exibir_estatisticas():
+def exibir_visualizacao():
     df = get_dataframe()
     if df is None:
         st.warning("Carregue os dados primeiro")
         return
 
     with st.sidebar:
-        st.header("Filtros")
-        ano = st.selectbox("Ano", ["Todos"] + sorted(df['Ano'].unique(), reverse=True))
-        estado = st.selectbox("Estado", ["Todos"] + sorted(df['UF'].unique()))  # Alterado para UF
-        regiao = st.selectbox("Região", ["Todas"] + sorted(df['Região'].unique()))  # Nome corrigido
-
-    filtered_df = filter_data(df, ano, estado, regiao)
-
-    if not filtered_df.empty:
-        st.header("Estatísticas Populacionais")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Municípios", len(filtered_df))
-        with col2:
-            st.metric("População Total", f"{filtered_df['População'].sum():,.0f}")
-        with col3:
-            st.metric("Média Municipal", f"{filtered_df['População'].mean():,.0f}")
-
-        min_row = filtered_df.loc[filtered_df['População'].idxmin()]
-        max_row = filtered_df.loc[filtered_df['População'].idxmax()]
-
-        stats_data = {
-            "População Mínima": f"{min_row['Município']} ({min_row['UF']}) - {min_row['Código']}: {min_row['População']:,.0f} hab",
-            "População Máxima": f"{max_row['Município']} ({max_row['UF']}) - {max_row['Código']}: {max_row['População']:,.0f} hab",
-            "Desvio Padrão": f"{filtered_df['População'].std():,.0f}",
-            "1º Quartil": f"{filtered_df['População'].quantile(0.25):,.0f}",
-            "Mediana": f"{filtered_df['População'].median():,.0f}",
-            "3º Quartil": f"{filtered_df['População'].quantile(0.75):,.0f}"
-        }
-
-        stats_df = pd.DataFrame({
-            "Métrica": stats_data.keys(),
-            "Valor": stats_data.values()
-        })
-
-        AgGrid(
-            stats_df,
-            height=250,
-            fit_columns_on_grid_load=True,
-            theme='streamlit',
-            gridOptions={
-                "columnDefs": [
-                    {"headerName": "Métrica", "field": "Métrica", "width": 150},
-                    {"headerName": "Valor", "field": "Valor", "width": 400}
-                ]
-            }
+        st.header("⚙️ Filtros de Visualização")
+        num_municipios = st.slider(
+            "Número de Municípios nos Gráficos",
+            min_value=5,
+            max_value=50,
+            value=10,
+            help="Selecione quantos municípios mostrar nos gráficos de barra e linha"
         )
-    else:
-        st.warning("Nenhum dado encontrado com os filtros selecionados")
+
+        ano = st.selectbox(
+            "Ano de Referência",
+            options=sorted(df['Ano'].unique(), reverse=True),
+            key="vis_ano"
+        )
+        tipo_grafico = st.selectbox(
+            "Tipo de Visualização",
+            options=["Mapa", "Gráfico de Barras", "Gráfico de Linhas", "Hierarquia"],
+            format_func=lambda x: f"📊 {x}",
+            key="tipo_grafico"
+        )
+
+    filtered_df = df[df['Ano'] == ano]
+    if tipo_grafico == "Mapa":
+        display_map(filtered_df)
+        
+    elif tipo_grafico == "Gráfico de Barras":
+        display_graphs(filtered_df, 'Município', 'População', 'Barra', num_municipios)
+        
+    elif tipo_grafico == "Gráfico de Linhas":
+        display_graphs(filtered_df, 'Ano', 'População', 'Linha', num_municipios)
+        
+    elif tipo_grafico == "Hierarquia":
+        fig = px.treemap(
+            filtered_df,
+            path=['Região', 'UF', 'Município'],
+            values='População',
+            color='População',
+            color_continuous_scale='Blues',
+            title=f"Distribuição Hierárquica - {ano}"
+        )
+        fig.update_layout(margin=dict(t=40, l=20, r=20, b=20))
+        st.plotly_chart(fig, use_container_width=True)
             
 def remover_acentos_e_lower(texto: str) -> str:
     return ''.join(
