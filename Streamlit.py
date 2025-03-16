@@ -77,6 +77,7 @@ def load_data() -> pd.DataFrame | None:
             'numero_habitantes': 'População',
             'faixa_populacao': 'Faixa de População', 
             'nome_municipio': 'Município',
+            'sigla_uf': 'UF',
             'nome_uf': 'Estados', 
             'nome_regiao': 'Regiões',
             'latitude': 'Latitude', 
@@ -167,37 +168,44 @@ def exibir_estatisticas():
 
     if not filtered_df.empty:
         st.header("Estatísticas Populacionais")
-        
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Municípios", len(filtered_df))
         with col2:
             st.metric("População Total", f"{filtered_df['População'].sum():,.0f}")
         with col3:
-            st.metric("Média por Município", f"{filtered_df['População'].mean():,.0f}")
+            st.metric("Média Municipal", f"{filtered_df['População'].mean():,.0f}")
 
-        min_pop = filtered_df.loc[filtered_df['População'].idxmin()]
-        max_pop = filtered_df.loc[filtered_df['População'].idxmax()]
+        min_pop = filtered_df.nsmallest(1, 'População').iloc[0]
+        max_pop = filtered_df.nlargest(1, 'População').iloc[0]
+        
+        def formatar_municipio(row):
+            return f"{row['Município']} ({row['Estados'][:2]}) - {row['Código']}"  # Supondo que existe a coluna 'Código'
 
         stats_data = {
-            "Desvio Padrão": filtered_df['População'].std(),
-            "1º Quartil": filtered_df['População'].quantile(0.25),
-            "Mediana": filtered_df['População'].median(),
-            "3º Quartil": filtered_df['População'].quantile(0.75),
-            "Mínimo": f"{min_pop['Município']} ({min_pop['População']:,.0f})",
-            "Máximo": f"{max_pop['Município']} ({max_pop['População']:,.0f})"
+            "População Mínima": f"{formatar_municipio(min_pop)}: {min_pop['População']:,.0f} hab",
+            "População Máxima": f"{formatar_municipio(max_pop)}: {max_pop['População']:,.0f} hab",
+            "Desvio Padrão": f"{filtered_df['População'].std():,.0f}",
+            "1º Quartil": f"{filtered_df['População'].quantile(0.25):,.0f}",
+            "Mediana": f"{filtered_df['População'].median():,.0f}",
+            "3º Quartil": f"{filtered_df['População'].quantile(0.75):,.0f}"
         }
-
-        stats = pd.DataFrame({
+        stats_df = pd.DataFrame({
             "Métrica": stats_data.keys(),
             "Valor": stats_data.values()
         })
 
         AgGrid(
-            stats,
-            height=200,
+            stats_df,
+            height=250,
             fit_columns_on_grid_load=True,
-            theme='streamlit'
+            theme='streamlit',
+            gridOptions={
+                "columnDefs": [
+                    {"headerName": "Métrica", "field": "Métrica", "width": 150},
+                    {"headerName": "Valor", "field": "Valor", "width": 250}
+                ]
+            }
         )
     else:
         st.warning("Nenhum dado encontrado com os filtros selecionados")
