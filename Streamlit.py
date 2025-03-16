@@ -291,14 +291,13 @@ def exibir_visualizacao():
 
     with st.sidebar:
         st.header("⚙️ Filtros de Visualização")
-         top_n = st.slider(
+        top_n = st.slider(
             "Número de UFs a mostrar",
             min_value=5,
             max_value=20,
             value=10,
             help="Selecione quantas Unidades Federativas deseja visualizar"
-        )
-        
+        )    
         ano = st.selectbox(
             "Ano de Referência",
             options=sorted(df['Ano'].unique(), reverse=True),
