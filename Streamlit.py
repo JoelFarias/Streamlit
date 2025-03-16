@@ -269,93 +269,31 @@ def exibir_visualizacao():
         if 'Mapa' in grafico_selecionado:
             display_map(filtered_df)
 def css():
-    st.markdown(
-        """
-        <style>
-        /* Suporte a temas claro e escuro */
-        body {
-            font-family: Arial, sans-serif;
-        }
-
-        /* Modo Claro */
-        @media (prefers-color-scheme: light) {
-            body {
-                background-color: #ffffff;
-                color: #000000;
-            }
-
-            h1 {
-                color: #333333;
-            }
-
-            .sidebar .sidebar-content {
-                background-color: #f0f0f0;
-            }
-
-            .menu li a {
-                background-color: #e0e0e0;
-                color: black;
-            }
-
-            .menu li a:hover {
-                background-color: #ffcccb;
-            }
-
-            .table-container table {
-                background-color: #ffffff;
-                border-color: #cccccc;
-            }
-
-            th {
-                background-color: #f5f5f5;
-            }
-
-            td {
-                background-color: #ffffff;
-            }
-        }
-
-        /* Modo Escuro */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #1d1d1d;
-                color: #ffffff;
-            }
-
-            h1 {
-                color: #f5f5f5;
-            }
-
-            .sidebar .sidebar-content {
-                background-color: #2c2c2c;
-            }
-
-            .menu li a {
-                background-color: #444;
-                color: white;
-            }
-
-            .menu li a:hover {
-                background-color: #e63946;
-            }
-
-            .table-container table {
-                background-color: #2c2c2c;
-                border-color: #444;
-            }
-
-            th {
-                background-color: #444;
-            }
-
-            td {
-                background-color: #333;
-            }
-        }
-        </style>
-        """, 
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] {
+        background: #f0f2f6;
+    }
+    .ag-theme-streamlit {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .ag-header-cell-label {
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+    }
+    .ag-cell {
+        font-family: 'Segoe UI', sans-serif;
+    }
+    [data-testid="stSidebar"] {
+        background: #ffffff;
+        border-right: 1px solid #e0e0e0;
+    }
+    .stSelectbox [data-baseweb="select"] {
+        border-radius: 8px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 def main():
 
