@@ -18,15 +18,38 @@ st.set_page_config(
 def css():
     st.markdown("""
     <style>
-        [data-testid="stAppViewContainer"] {background: #f8fafc;}
-        [data-testid="stSidebar"] {background: #ffffff!important; border-right: 1px solid #e2e8f0;}
-        div[data-baseweb="select"] > div {border: 1px solid #cbd5e1!important; border-radius: 8px!important;}
-        div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] {gap: 1rem;}
-        div[data-testid="stMetric"] {background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;}
-        div[data-testid="stMetric"] > div {justify-content: space-between;}
-        div[data-testid="stMetricLabel"] {color: #64748b;}
-        div[data-testid="stMetricValue"] {color: #1e293b; font-weight: 600;}
-        .stPlotlyChart {border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;}
+        [data-testid="stAppViewContainer"] {
+            background: #f8fafc;
+        }
+        [data-testid="stSidebar"] {
+            background: #ffffff !important;
+            border-right: 1px solid #e2e8f0;
+        }
+        .ag-theme-streamlit {
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .ag-header-cell-label {
+            font-weight: 600 !important;
+            color: #2c3e50 !important;
+        }
+        .ag-cell {
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .stSelectbox [data-baseweb="select"] {
+            border-radius: 8px;
+        }
+        div[data-testid="stMetric"] {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .stPlotlyChart {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -50,146 +73,141 @@ def load_data() -> pd.DataFrame | None:
         """
         df = pd.read_sql(query, conn)
         mapeamento_colunas = {
-            'ano_pesquisa': 'Ano', 'numero_habitantes': 'População',
-            'faixa_populacao': 'Faixa de População', 'nome_municipio': 'Município',
-            'nome_uf': 'Estados', 'nome_regiao': 'Regiões',
-            'latitude': 'Latitude', 'longitude': 'Longitude'
+            'ano_pesquisa': 'Ano', 
+            'numero_habitantes': 'População',
+            'faixa_populacao': 'Faixa de População', 
+            'nome_municipio': 'Município',
+            'nome_uf': 'Estados', 
+            'nome_regiao': 'Regiões',
+            'latitude': 'Latitude', 
+            'longitude': 'Longitude'
         }
         df.rename(columns=mapeamento_colunas, inplace=True)
         df['Ano'] = df['Ano'].astype(str)
         df['População'] = pd.to_numeric(df['População'], errors='coerce')
-        return df
+        return df.dropna(subset=['População'])
     except (pg.Error, Exception) as e:
         st.error(f"Erro ao carregar dados: {e}")
         return None
 
-def filter_data(df, ano, estados, regioes, pop_min, pop_max, municipio):
+def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
+    """Filtra os dados de acordo com ano, estado e região."""
     filtered = df.copy()
-    
     if ano != "Todos":
-        filtered = filtered[filtered["Ano"] == ano]
-    
-    if "Todos" not in estados:
-        filtered = filtered[filtered["Estados"].isin(estados)]
-    
-    if "Todas" not in regioes:
-        filtered = filtered[filtered["Regiões"].isin(regioes)]
-    
-    filtered = filtered[(filtered["População"] >= pop_min) & (filtered["População"] <= pop_max)]
-    
-    if municipio:
-        sugestoes = sugerir_municipios(municipio, filtered)
-        filtered = filtered[filtered["Município"].isin(sugestoes)]
-    
+        filtered = filtered[filtered['Ano'] == ano]
+    if estado != "Todos":
+        filtered = filtered[filtered['Estados'] == estado]
+    if regiao != "Todas":
+        filtered = filtered[filtered['Regiões'] == regiao]
     return filtered
 
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
 
-
 def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
     municipios = df['Município'].unique()
     municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
-
     municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
     sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
-
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
+
 
 def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
     if df.empty:
         st.warning("Nenhum dado disponível para os filtros selecionados.")
         return
 
-    if not pd.api.types.is_numeric_dtype(df[y_col]):
-        st.error(f"Erro: A coluna '{y_col}' precisa ser numérica para este gráfico.")
-        return
-
     try:
         if grafico == 'Barra':
-            fig = px.bar(df, x=x_col, y=y_col, color='Estados', barmode='group', title=f'{y_col} por {x_col}')
+            fig = px.bar(df, x=x_col, y=y_col, color='Estados', 
+                        barmode='group', template='plotly_white')
         elif grafico == 'Pizza':
-            fig = px.pie(df, names=x_col, values=y_col, title=f'Distribuição de {y_col} por {x_col}')
+            fig = px.pie(df, names=x_col, values=y_col, 
+                        color_discrete_sequence=px.colors.qualitative.Pastel)
         elif grafico == 'Linha':
-            fig = px.line(df, x=x_col, y=y_col, color='Estados', title=f'{y_col} ao longo de {x_col}')
-        st.plotly_chart(fig)
-    except ValueError as e:
-        st.error(f"Erro ao exibir o gráfico: {e}")
+            fig = px.line(df, x=x_col, y=y_col, color='Estados', 
+                         markers=True, template='plotly_white')
+        fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erro ao gerar gráfico: {e}")
 
 def display_map(df: pd.DataFrame):
-    if df.empty or 'Latitude' not in df.columns or 'Longitude' not in df.columns:
-        st.write("Dados de latitude e longitude não disponíveis.")
-        return
-
-    mapa_fig = px.scatter_mapbox(
-        df, lat="Latitude", lon="Longitude", size="População", color="Estados",
-        hover_name="Município", title="Distribuição Populacional",
-        mapbox_style="carto-positron", zoom=3
-    )
-    st.plotly_chart(mapa_fig)
+    if not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:
+        fig = px.scatter_mapbox(
+            df, lat="Latitude", lon="Longitude", size="População",
+            color="Estados", hover_name="Município", zoom=3,
+            mapbox_style="carto-positron", height=600
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("Dados geográficos incompletos")
 
 def carregar_dados():
     with st.spinner('Carregando dados...'):
-        df = load_data()  
+        df = load_data()
         if df is not None:
-            st.success("Dados carregados com sucesso!") 
-            st.dataframe(df.head())
             st.session_state.df = df
+            st.success("Dados carregados com sucesso!")
+            st.dataframe(df.head(3))
 
 def exibir_estatisticas():
     df = get_dataframe()
-    if df is not None:
-        col1, col2, col3 = st.sidebar.columns([3, 2, 2])
+    if df is None:
+        st.warning("Carregue os dados primeiro")
+        return
+
+    with st.sidebar:
+        st.header("Filtros")
+        ano = st.selectbox("Ano", ["Todos"] + sorted(df['Ano'].unique(), reverse=True))
+        estado = st.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
+        regiao = st.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+
+    filtered_df = filter_data(df, ano, estado, regiao)
+
+    if not filtered_df.empty:
+        st.header("Estatísticas Populacionais")
+        
+        col1, col2, col3 = st.columns(3)
         with col1:
-            ano_pesquisa = st.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
+            st.metric("Municípios", len(filtered_df))
         with col2:
-            estado = st.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
+            st.metric("População Total", f"{filtered_df['População'].sum():,.0f}")
         with col3:
-            regiao = st.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+            st.metric("Média por Município", f"{filtered_df['População'].mean():,.0f}")
 
-        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+        min_pop = filtered_df.loc[filtered_df['População'].idxmin()]
+        max_pop = filtered_df.loc[filtered_df['População'].idxmax()]
 
-        if not filtered_df.empty:
-            min_pop = filtered_df.loc[filtered_df['População'].idxmin()]
-            max_pop = filtered_df.loc[filtered_df['População'].idxmax()]
-            
-            stats_data = {
-                "count": ("🏙️ Quantidade de Municípios", f"{len(filtered_df):,}"),
-                "mean": ("📊 Média Populacional", f"{filtered_df['População'].mean():,.2f}"),
-                "std": ("📈 Desvio Padrão", f"{filtered_df['População'].std():,.2f}"),
-                "min": ("🔻 Menor População", f"{min_pop['Município']} ({min_pop['População']:,.0f} hab)"),
-                "25%": ("📉 1º Quartil", f"{filtered_df['População'].quantile(0.25):,.0f}"),
-                "50%": ("📐 Mediana", f"{filtered_df['População'].median():,.0f}"),
-                "75%": ("📈 3º Quartil", f"{filtered_df['População'].quantile(0.75):,.0f}"),
-                "max": ("🔺 Maior População", f"{max_pop['Município']} ({max_pop['População']:,.0f} hab)")
-            }
+        stats_data = {
+            "Desvio Padrão": filtered_df['População'].std(),
+            "1º Quartil": filtered_df['População'].quantile(0.25),
+            "Mediana": filtered_df['População'].median(),
+            "3º Quartil": filtered_df['População'].quantile(0.75),
+            "Mínimo": f"{min_pop['Município']} ({min_pop['População']:,.0f})",
+            "Máximo": f"{max_pop['Município']} ({max_pop['População']:,.0f})"
+        }
 
-            stats = pd.DataFrame({
-                "Métrica": [v[0] for v in stats_data.values()],
-                "Valor": [v[1] for v in stats_data.values()]
-            })
+        stats = pd.DataFrame({
+            "Métrica": stats_data.keys(),
+            "Valor": stats_data.values()
+        })
 
-            gb = GridOptionsBuilder.from_dataframe(stats)
-            gb.configure_column("Métrica", headerName="Métrica", width=300, cellStyle={'font-weight': 'bold'})
-            gb.configure_column("Valor", headerName="Valor", width=200, type=["rightAligned"])
-            gb.configure_grid_options(domLayout='autoHeight', suppressRowHoverHighlight=True)
-            grid_options = gb.build()
-
-            st.markdown("### 📌 Estatísticas Descritivas")
-            AgGrid(stats, 
-                 gridOptions=grid_options,
-                 height=350,
-                 fit_columns_on_grid_load=True,
-                 theme='streamlit')
-
-        else:
-            st.warning("⚠️ Nenhum dado encontrado para os filtros selecionados.")
+        AgGrid(
+            stats,
+            height=200,
+            fit_columns_on_grid_load=True,
+            theme='streamlit'
+        )
+    else:
+        st.warning("Nenhum dado encontrado com os filtros selecionados")
             
 def remover_acentos_e_lower(texto: str) -> str:
     return ''.join(
         c for c in unicodedata.normalize('NFD', texto)
         if unicodedata.category(c) != 'Mn'
     ).lower()
+
 
 def exibir_visualizacao():
     df = get_dataframe()
