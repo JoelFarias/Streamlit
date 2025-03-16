@@ -118,7 +118,7 @@ def filter_data(df, ano, estado, regiao, faixa_pop, municipio):
     
     filtered = filtered[
         (filtered["População"] >= faixa_pop[0]) & 
-        (filtered["População"] <= faixa_pop[1])
+        (filtered["População"] <= faixa_pop[1])]
     
     if municipio:
         sugestoes = sugerir_municipios(municipio, filtered)
