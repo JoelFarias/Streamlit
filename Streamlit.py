@@ -128,30 +128,30 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
         return
 
     try:
-        top_ufs = df.groupby('UF')['População'].sum().nlargest(10).index
-        df_filtered = df[df['UF'].isin(top_ufs)]
+        top_municipios = df.nlargest(10, 'População')['Município'].unique()
+        df_filtered = df[df['Município'].isin(top_municipios)]
 
         if grafico == 'Barra':
             fig = px.bar(
                 df_filtered,
-                x=x_col,
-                y=y_col,
+                x='Município',
+                y='População',
                 color='UF',
                 template='plotly_white',
                 color_discrete_sequence=px.colors.sequential.Blues,
                 labels={'População': 'Habitantes'},
-                title=f"Top 10 UFs - {y_col} por {x_col}"
+                title="Top 10 Municípios Mais Populosos"
             )
         elif grafico == 'Linha':
-            df_agg = df_filtered.groupby([x_col, 'UF'])[y_col].sum().reset_index()
+            df_agg = df_filtered.groupby([x_col, 'Município'])['População'].sum().reset_index()
             fig = px.line(
                 df_agg,
                 x=x_col,
                 y=y_col,
-                color='UF',
+                color='Município',
                 markers=True,
                 color_discrete_sequence=px.colors.qualitative.Pastel,
-                title="Evolução Populacional das 10 Maiores UFs"
+                title="Evolução Populacional dos 10 Maiores Municípios"
             )
             
         fig.update_layout(
@@ -160,7 +160,7 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             yaxis_title='População',
             margin=dict(l=20, r=20, t=40, b=20),
             legend=dict(
-                title='UF',
+                title='Município',
                 orientation='h',
                 yanchor='bottom',
                 y=1.02,
@@ -172,7 +172,7 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
         
     except Exception as e:
         st.error(f"Erro ao gerar visualização: {str(e)}")
-
+        
 def display_map(df: pd.DataFrame):
     if not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:
         df = df.dropna(subset=['Latitude', 'Longitude'])
@@ -291,13 +291,13 @@ def exibir_visualizacao():
 
     with st.sidebar:
         st.header("⚙️ Filtros de Visualização")
-        top_n = st.slider(
-            "Número de UFs a mostrar",
+        num_municipios = st.slider(
+            "Número de Municípios a Mostrar",
             min_value=5,
-            max_value=20,
+            max_value=50,
             value=10,
-            help="Selecione quantas Unidades Federativas deseja visualizar"
-        )    
+            help="Selecione quantos municípios deseja visualizar"
+        )
         ano = st.selectbox(
             "Ano de Referência",
             options=sorted(df['Ano'].unique(), reverse=True),
