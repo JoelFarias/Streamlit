@@ -296,26 +296,34 @@ def css():
     """, unsafe_allow_html=True)
 
 def main():
-
-    css() 
-    st.markdown("<h1>Análise de Dados Populacionais</h1>", unsafe_allow_html=True)
+    st.set_page_config(
+        page_title="Análise Populacional Brasil",
+        page_icon="🌐",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    css()
+    
+    st.markdown("<h1 style='text-align: center; color: #2c3e50; margin-bottom: 30px;'>🌍 Análise Populacional do Brasil</h1>", unsafe_allow_html=True)
 
     menu = option_menu(
-        menu_title="Menu",
+        menu_title=None,
         options=["Carregar Dados", "Estatísticas", "Visualização"],
-        icons=["cloud-upload", "bar-chart", "eye"],
-        menu_icon="cast",
+        icons=["cloud-upload", "graph-up", "map"],
         default_index=0,
-        orientation="vertical",
+        orientation="horizontal",
         styles={
-            "container": {"padding": "5px", "background-color": "#f0f2f6"},
-            "icon": {"color": "orange", "font-size": "25px"},
+            "container": {"padding": "15px", "background-color": "#f8f9fa"},
+            "icon": {"color": "#2c3e50", "font-size": "20px"}, 
             "nav-link": {
-                "font-size": "16px", "text-align": "left",
-                "margin": "0px",
-                "--hover-color": "#eee",
+                "font-size": "16px",
+                "color": "#2c3e50",
+                "margin": "0px 10px",
+                "border-radius": "8px",
+                "padding": "12px 20px"
             },
-            "nav-link-selected": {"background-color": "#ff4b4b"},
+            "nav-link-selected": {"background-color": "#4a90e2", "color": "white"},
         }
     )
 
@@ -325,6 +333,3 @@ def main():
         exibir_estatisticas()
     elif menu == "Visualização":
         exibir_visualizacao()
-
-if __name__ == "__main__":
-    main()
