@@ -219,6 +219,63 @@ def carregar_dados():
             st.success("Dados carregados com sucesso!")
             st.dataframe(df.head(3))
 
+def exibir_estatisticas():
+    df = get_dataframe()
+    if df is None:
+        st.warning("Carregue os dados primeiro")
+        return
+
+    with st.sidebar:
+        st.header("Filtros")
+        ano = st.selectbox("Ano", ["Todos"] + sorted(df['Ano'].unique(), reverse=True))
+        estado = st.selectbox("Estado", ["Todos"] + sorted(df['UF'].unique())) 
+        regiao = st.selectbox("Região", ["Todas"] + sorted(df['Região'].unique()))  
+
+    filtered_df = filter_data(df, ano, estado, regiao)
+
+    if not filtered_df.empty:
+        st.header("Estatísticas Populacionais")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Municípios", len(filtered_df))
+        with col2:
+            st.metric("População Total", f"{filtered_df['População'].sum():,.0f}")
+        with col3:
+            st.metric("Média Municipal", f"{filtered_df['População'].mean():,.0f}")
+
+        min_row = filtered_df.loc[filtered_df['População'].idxmin()]
+        max_row = filtered_df.loc[filtered_df['População'].idxmax()]
+
+        stats_data = {
+            "População Mínima": f"{min_row['Município']} ({min_row['UF']}) - {min_row['Código']}: {min_row['População']:,.0f} hab",
+            "População Máxima": f"{max_row['Município']} ({max_row['UF']}) - {max_row['Código']}: {max_row['População']:,.0f} hab",
+            "Desvio Padrão": f"{filtered_df['População'].std():,.0f}",
+            "1º Quartil": f"{filtered_df['População'].quantile(0.25):,.0f}",
+            "Mediana": f"{filtered_df['População'].median():,.0f}",
+            "3º Quartil": f"{filtered_df['População'].quantile(0.75):,.0f}"
+        }
+
+        stats_df = pd.DataFrame({
+            "Métrica": stats_data.keys(),
+            "Valor": stats_data.values()
+        })
+
+        AgGrid(
+            stats_df,
+            height=250,
+            fit_columns_on_grid_load=True,
+            theme='streamlit',
+            gridOptions={
+                "columnDefs": [
+                    {"headerName": "Métrica", "field": "Métrica", "width": 150},
+                    {"headerName": "Valor", "field": "Valor", "width": 400}
+                ]
+            }
+        )
+    else:
+        st.warning("Nenhum dado encontrado com os filtros selecionados")
+
 def exibir_visualizacao():
     df = get_dataframe()
     if df is None:
