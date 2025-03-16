@@ -148,7 +148,7 @@ def exibir_estatisticas():
             gb.configure_grid_options(domLayout='autoHeight', suppressRowHoverHighlight=True)
             grid_options = gb.build()
 
-            st.markdown("### 📌 Estatísticas Detalhadas")
+            st.markdown("### 📌 Estatísticas Descritivas")
             AgGrid(stats, 
                  gridOptions=grid_options,
                  height=350,
