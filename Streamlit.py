@@ -122,30 +122,51 @@ def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 
     sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
     return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
 
-
 def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
     if df.empty:
-        st.warning("Nenhum dado disponível para os filtros selecionados.")
+        st.warning("Nenhum dado disponível para os filtros selecionados")
         return
 
     try:
         if grafico == 'Barra':
-            fig = px.bar(df, x=x_col, y=y_col, color='Estados', 
-                        barmode='group', template='plotly_white')
-        elif grafico == 'Pizza':
-            fig = px.pie(df, names=x_col, values=y_col, 
-                        color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig = px.bar(
+                df,
+                x=x_col,
+                y=y_col,
+                color='UF',
+                template='plotly_white',
+                color_discrete_sequence=px.colors.sequential.Blues,
+                labels={'População': 'Habitantes'}
+            )
         elif grafico == 'Linha':
-            fig = px.line(df, x=x_col, y=y_col, color='Estados', 
-                         markers=True, template='plotly_white')
-        fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+            fig = px.line(
+                df.groupby([x_col, 'UF'])[y_col].sum().reset_index(),
+                x=x_col,
+                y=y_col,
+                color='UF',
+                markers=True,
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis_title='',
+            yaxis_title='População',
+            margin=dict(l=20, r=20, t=40, b=20),
+            hoverlabel=dict(
+                bgcolor='white',
+                font_size=14
+            )
+        )
         st.plotly_chart(fig, use_container_width=True)
+        
     except Exception as e:
-        st.error(f"Erro ao gerar gráfico: {e}")
+        st.error(f"Erro ao gerar visualização: {str(e)}")
 
 def display_map(df: pd.DataFrame):
-    if not df.empty and 'Latitude' in df and 'Longitude' in df:
+    if not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:
         df = df.dropna(subset=['Latitude', 'Longitude'])
+        
         fig = px.scatter_mapbox(
             df,
             lat="Latitude",
@@ -153,6 +174,13 @@ def display_map(df: pd.DataFrame):
             size="População",
             color="UF",
             hover_name="Município",
+            hover_data={
+                'População': ':,',
+                'UF': True,
+                'Região': True,
+                'Latitude': False,
+                'Longitude': False
+            },
             zoom=3,
             color_discrete_sequence=px.colors.qualitative.Pastel,
             mapbox_style="carto-positron",
@@ -160,16 +188,19 @@ def display_map(df: pd.DataFrame):
         )
         fig.update_layout(
             margin=dict(l=0, r=0, t=30, b=0),
-            hoverlabel=dict(
-                bgcolor=CORES['fundo'],
-                font_size=14,
-                font_color=CORES['texto']
+            legend=dict(
+                title='Estados',
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1
             )
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Dados geográficos não disponíveis para visualização")
-
+        st.warning("Dados geográficos insuficientes para exibir o mapa")
+        
 def carregar_dados():
     with st.spinner('Carregando dados...'):
         df = load_data()
@@ -249,39 +280,75 @@ def exibir_visualizacao():
         return
 
     with st.sidebar:
-        st.header("Configurações")
+        st.header("⚙️ Filtros de Visualização")
         ano = st.selectbox(
             "Ano de Referência",
-            options=sorted(df['Ano'].unique()),
+            options=sorted(df['Ano'].unique(), reverse=True),
             key="vis_ano"
         )
+        estado = st.selectbox(
+            "Estado", 
+            options=["Todos"] + sorted(df['UF'].unique()),
+            key="vis_estado"
+        )
+        regiao = st.selectbox(
+            "Região", 
+            options=["Todas"] + sorted(df['Região'].unique()),
+            key="vis_regiao"
+        )
+        
+        municipio_input = st.text_input("Buscar Município:")
+        sugestoes = []
+        if municipio_input:
+            sugestoes = sugerir_municipios(municipio_input, df)
+            if sugestoes:
+                st.markdown(f"<small>Sugestões: {', '.join(sugestoes[:3])}</small>", unsafe_allow_html=True)
+
         tipo_grafico = st.selectbox(
             "Tipo de Visualização",
-            options=["Mapa de Calor", "Hierarquia Regional"],
-            format_func=lambda x: f"📌 {x}"
+            options=["Mapa", "Gráfico de Barras", "Gráfico de Linhas", "Hierarquia"],
+            format_func=lambda x: f"📊 {x}",
+            key="tipo_grafico"
         )
 
     filtered_df = df[df['Ano'] == ano]
-
-    if tipo_grafico == "Mapa de Calor":
+    
+    if estado != "Todos":
+        filtered_df = filtered_df[filtered_df['UF'] == estado]
+        
+    if regiao != "Todas":
+        filtered_df = filtered_df[filtered_df['Região'] == regiao]
+        
+    if municipio_input and sugestoes:
+        filtered_df = filtered_df[filtered_df['Município'].isin(sugestoes)]
+        
+    st.header("🌍 Visualização Interativa")
+    
+    if tipo_grafico == "Mapa":
         display_map(filtered_df)
-    else:
+        
+    elif tipo_grafico == "Gráfico de Barras":
+        col1, col2 = st.columns(2)
+        with col1:
+            x_axis = st.selectbox("Eixo X", options=['UF', 'Região', 'Município'])
+        with col2:
+            y_axis = st.selectbox("Eixo Y", options=['População'])
+            
+        display_graphs(filtered_df, x_axis, y_axis, 'Barra')
+        
+    elif tipo_grafico == "Gráfico de Linhas":
+        display_graphs(filtered_df, 'Ano', 'População', 'Linha')
+        
+    elif tipo_grafico == "Hierarquia":
         fig = px.treemap(
             filtered_df,
             path=['Região', 'UF', 'Município'],
             values='População',
             color='População',
             color_continuous_scale='Blues',
-            title=f"Distribuição Populacional - {ano}"
+            title=f"Distribuição Hierárquica - {ano}"
         )
-        fig.update_layout(
-            margin=dict(t=40, l=0, r=0, b=0),
-            coloraxis_colorbar=dict(
-                title="População",
-                thickness=20,
-                tickformat=",.0f"
-            )
-        )
+        fig.update_layout(margin=dict(t=40, l=20, r=20, b=20))
         st.plotly_chart(fig, use_container_width=True)
         
 def css():
