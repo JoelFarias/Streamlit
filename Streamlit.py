@@ -15,43 +15,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+CORES = {
+    'fundo': '#F8FBFE',
+    'destaque': '#2A5C8A',
+    'secundaria': '#5DA8A3',
+    'texto': '#2C3E50',
+    'positivo': '#27AE60',
+    'negativo': '#C0392B'
+}
+
 def css():
-    st.markdown("""
+    st.markdown(f"""
     <style>
-        [data-testid="stAppViewContainer"] {
-            background: #f8fafc;
-        }
-        [data-testid="stSidebar"] {
-            background: #ffffff !important;
-            border-right: 1px solid #e2e8f0;
-        }
-        .ag-theme-streamlit {
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .ag-header-cell-label {
-            font-weight: 600 !important;
-            color: #2c3e50 !important;
-        }
-        .ag-cell {
-            font-family: 'Segoe UI', sans-serif;
-        }
-        .stSelectbox [data-baseweb="select"] {
-            border-radius: 8px;
-        }
-        div[data-testid="stMetric"] {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 15px;
-        }
-        .stPlotlyChart {
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 10px;
-        }
+        [data-testid="stAppViewContainer"] {{
+            background: {CORES['fundo']};
+        }}
+        [data-testid="stSidebar"] {{
+            background: #FFFFFF !important;
+            border-right: 1px solid {CORES['secundaria']}20;
+        }}
+        h1, h2, h3 {{
+            color: {CORES['destaque']} !important;
+        }}
+        .stSelectbox [data-baseweb="select"] {{
+            border-radius: 8px !important;
+            border: 1px solid {CORES['secundaria']} !important;
+        }}
+        .st-bb {{ /* Blocos Streamlit */
+            background: #FFFFFF;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px {CORES['secundaria']}10;
+        }}
+        .stMetric {{
+            color: {CORES['destaque']} !important;
+        }}
+        [data-testid="stMetricValue"] {{
+            font-size: 1.4rem !important;
+        }}
     </style>
     """, unsafe_allow_html=True)
+
 
 @st.cache_data(ttl=600)
 def load_data() -> pd.DataFrame | None:
@@ -140,15 +144,31 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
         st.error(f"Erro ao gerar gráfico: {e}")
 
 def display_map(df: pd.DataFrame):
-    if not df.empty and 'Latitude' in df.columns and 'Longitude' in df.columns:
+    if not df.empty and 'Latitude' in df and 'Longitude' in df:
+        df = df.dropna(subset=['Latitude', 'Longitude'])
         fig = px.scatter_mapbox(
-            df, lat="Latitude", lon="Longitude", size="População",
-            color="Estados", hover_name="Município", zoom=3,
-            mapbox_style="carto-positron", height=600
+            df,
+            lat="Latitude",
+            lon="Longitude",
+            size="População",
+            color="UF",
+            hover_name="Município",
+            zoom=3,
+            color_discrete_sequence=px.colors.qualitative.Pastel,
+            mapbox_style="carto-positron",
+            height=600
+        )
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=30, b=0),
+            hoverlabel=dict(
+                bgcolor=CORES['fundo'],
+                font_size=14,
+                font_color=CORES['texto']
+            )
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Dados geográficos incompletos")
+        st.warning("Dados geográficos não disponíveis para visualização")
 
 def carregar_dados():
     with st.spinner('Carregando dados...'):
@@ -230,17 +250,38 @@ def exibir_visualizacao():
 
     with st.sidebar:
         st.header("Configurações")
-        ano = st.selectbox("Ano", sorted(df['Ano'].unique()), key="vis_ano")
-        tipo_grafico = st.selectbox("Tipo de Visualização", ["Mapa", "Gráfico Hierárquico"])
+        ano = st.selectbox(
+            "Ano de Referência",
+            options=sorted(df['Ano'].unique()),
+            key="vis_ano"
+        )
+        tipo_grafico = st.selectbox(
+            "Tipo de Visualização",
+            options=["Mapa de Calor", "Hierarquia Regional"],
+            format_func=lambda x: f"📌 {x}"
+        )
 
     filtered_df = df[df['Ano'] == ano]
 
-    if tipo_grafico == "Mapa":
+    if tipo_grafico == "Mapa de Calor":
         display_map(filtered_df)
     else:
-        fig = px.treemap(filtered_df, path=['Regiões', 'Estados', 'Município'], 
-                         values='População', color='População',
-                         color_continuous_scale='Blues')
+        fig = px.treemap(
+            filtered_df,
+            path=['Região', 'UF', 'Município'],
+            values='População',
+            color='População',
+            color_continuous_scale='Blues',
+            title=f"Distribuição Populacional - {ano}"
+        )
+        fig.update_layout(
+            margin=dict(t=40, l=0, r=0, b=0),
+            coloraxis_colorbar=dict(
+                title="População",
+                thickness=20,
+                tickformat=",.0f"
+            )
+        )
         st.plotly_chart(fig, use_container_width=True)
         
 def css():
