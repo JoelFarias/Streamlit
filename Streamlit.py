@@ -8,6 +8,13 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 from st_aggrid import AgGrid, GridOptionsBuilder
 
+st.set_page_config(
+    page_title="Análise Populacional",
+    page_icon="🌎",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 @st.cache_data(ttl=600)
 def load_data() -> pd.DataFrame | None:
     try:
@@ -52,8 +59,6 @@ def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.Data
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
 
-def renomear_colunas(df: pd.DataFrame, mapeamento_colunas: dict) -> pd.DataFrame:
-    return df.rename(columns=mapeamento_colunas)
 
 def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
     municipios = df['Município'].unique()
