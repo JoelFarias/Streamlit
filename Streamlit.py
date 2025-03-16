@@ -150,15 +150,6 @@ def remover_acentos_e_lower(texto: str) -> str:
         if unicodedata.category(c) != 'Mn'
     ).lower()
 
-def sugerir_municipios(municipio_digitado: str, df: pd.DataFrame, limite: int = 5) -> list[str]:
-    municipios = df['Município'].unique()
-    municipios_normalizados = [remover_acentos_e_lower(m) for m in municipios]
-
-    municipio_digitado_normalizado = remover_acentos_e_lower(municipio_digitado)
-    sugestoes = process.extract(municipio_digitado_normalizado, municipios_normalizados, limit=limite)
-
-    return [municipios[municipios_normalizados.index(m)] for m, _ in sugestoes]
-
 def exibir_visualizacao():
     df = get_dataframe()
     if df is not None:
