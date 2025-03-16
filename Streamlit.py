@@ -98,15 +98,14 @@ def load_data() -> pd.DataFrame | None:
         st.error(f"Erro ao carregar dados: {e}")
         return None
 
-def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
-    """Filtra os dados de acordo com ano, estado e região."""
+def filter_data(df: pd.DataFrame, ano: str, uf: str, regiao: str) -> pd.DataFrame:
     filtered = df.copy()
     if ano != "Todos":
         filtered = filtered[filtered['Ano'] == ano]
-    if estado != "Todos":
-        filtered = filtered[filtered['Estados'] == estado]
+    if uf != "Todos":
+        filtered = filtered[filtered['UF'] == uf]
     if regiao != "Todas":
-        filtered = filtered[filtered['Regiões'] == regiao]
+        filtered = filtered[filtered['Região'] == regiao]
     return filtered
 
 def get_dataframe() -> pd.DataFrame | None:
