@@ -225,7 +225,7 @@ def exibir_visualizacao():
 
     with st.sidebar:
         st.header("Configurações")
-        ano = st.selectbox("Ano", sorted(df['Ano'].unique(), key="vis_ano")
+        ano = st.selectbox("Ano", sorted(df['Ano'].unique()), key="vis_ano")
         tipo_grafico = st.selectbox("Tipo de Visualização", ["Mapa", "Gráfico Hierárquico"])
 
     filtered_df = df[df['Ano'] == ano]
@@ -234,8 +234,8 @@ def exibir_visualizacao():
         display_map(filtered_df)
     else:
         fig = px.treemap(filtered_df, path=['Regiões', 'Estados', 'Município'], 
-                        values='População', color='População',
-                        color_continuous_scale='Blues')
+                         values='População', color='População',
+                         color_continuous_scale='Blues')
         st.plotly_chart(fig, use_container_width=True)
         
 def css():
