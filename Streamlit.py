@@ -211,108 +211,25 @@ def remover_acentos_e_lower(texto: str) -> str:
 
 def exibir_visualizacao():
     df = get_dataframe()
-    if df is not None:
-        ano_pesquisa = st.sidebar.selectbox(
-            "Ano da Pesquisa", 
-            sorted(df['Ano'].unique(), reverse=True), 
-            key="ano_pesquisa"
-        )
-        estado = st.sidebar.selectbox(
-            "Estado", 
-            ["Todos"] + sorted(df['Estados'].unique()), 
-            key="estado"
-        )
-        regiao = st.sidebar.selectbox(
-            "Região", 
-            ["Todas"] + sorted(df['Regiões'].unique()), 
-            key="regiao"
-        )
-        filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
+    if df is None:
+        st.warning("Carregue os dados primeiro")
+        return
 
-        grafico_selecionado = st.sidebar.multiselect(
-            "Escolha os gráficos para exibir:", 
-            ["Barra", "Pizza", "Linha", "Mapa"], 
-            key="grafico_selecionado"
-        )
+    with st.sidebar:
+        st.header("Configurações")
+        ano = st.selectbox("Ano", sorted(df['Ano'].unique(), key="vis_ano")
+        tipo_grafico = st.selectbox("Tipo de Visualização", ["Mapa", "Gráfico Hierárquico"])
 
-        colunas_categoricas = ['Município', 'Ano', 'Estados', 'Regiões']
-        colunas_numericas = ['População']
+    filtered_df = df[df['Ano'] == ano]
 
-        max_categorias = st.sidebar.slider(
-            "Número máximo de categorias a exibir", 
-            min_value=5, max_value=20, value=10, 
-            key="max_categorias"
-        )
-        categoria_especifica = st.sidebar.text_input(
-            "Buscar uma categoria específica (Município)", 
-            "", key="categoria_especifica"
-        )
-
-        if categoria_especifica:
-            sugestoes = sugerir_municipios(categoria_especifica, df, limite=5)
-            st.sidebar.write(f"Você quis dizer: {', '.join(sugestoes)}?")
-            
-            municipio_selecionado = st.sidebar.selectbox(
-                "Selecione um município sugerido", 
-                sugestoes, key="municipio_selecionado"
-            )
-            categoria_especifica_normalizada = remover_acentos_e_lower(municipio_selecionado)
-            df['Municipio_normalizado'] = df['Município'].apply(remover_acentos_e_lower)
-
-        if 'Barra' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna X (categórica):", 
-                options=colunas_categoricas, 
-                key="barra_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna Y (numérica):", 
-                options=colunas_numericas, 
-                key="barra_y_col"
-            )
-
-            top_n_df = filtered_df.nlargest(max_categorias, y_col)
-
-            if categoria_especifica and municipio_selecionado:
-                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
-                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
-
-            display_graphs(top_n_df, x_col, y_col, 'Barra')
-
-        if 'Pizza' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna para as fatias (categórica):", 
-                options=colunas_categoricas, 
-                key="pizza_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna para valores (numérica):", 
-                options=colunas_numericas, 
-                key="pizza_y_col"
-            )
-
-            top_n_df = filtered_df.nlargest(max_categorias, y_col)
-
-            if categoria_especifica and municipio_selecionado:
-                especifico_df = filtered_df[df['Municipio_normalizado'] == categoria_especifica_normalizada]
-                top_n_df = pd.concat([top_n_df, especifico_df]).drop_duplicates()
-
-            display_graphs(top_n_df, x_col, y_col, 'Pizza')
-
-        if 'Linha' in grafico_selecionado:
-            x_col = st.selectbox(
-                "Selecione a coluna X (Ano ou categórica):", 
-                options=['Ano'], 
-                key="linha_x_col"
-            )
-            y_col = st.selectbox(
-                "Selecione a coluna Y (numérica):", 
-                options=colunas_numericas, 
-                key="linha_y_col"
-            )
-            display_graphs(filtered_df, x_col, y_col, 'Linha')
-        if 'Mapa' in grafico_selecionado:
-            display_map(filtered_df)
+    if tipo_grafico == "Mapa":
+        display_map(filtered_df)
+    else:
+        fig = px.treemap(filtered_df, path=['Regiões', 'Estados', 'Município'], 
+                        values='População', color='População',
+                        color_continuous_scale='Blues')
+        st.plotly_chart(fig, use_container_width=True)
+        
 def css():
     st.markdown("""
     <style>
@@ -342,32 +259,16 @@ def css():
 
 def main():
     css()
+    st.title("🌍 Análise Populacional Brasileira")
     
-    st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>🌍 Análise Populacional do Brasil</h1>", 
-                unsafe_allow_html=True)
-
     menu = option_menu(
         menu_title=None,
         options=["Carregar Dados", "Estatísticas", "Visualização"],
-        icons=["cloud-upload", "graph-up", "map"],
-        default_index=0,
+        icons=["cloud-upload", "bar-chart", "map"],
         orientation="horizontal",
         styles={
-            "container": {"padding": "15px", "background-color": "#f8f9fa", "margin-bottom": "30px"},
-            "icon": {"color": "#2c3e50", "font-size": "20px"}, 
-            "nav-link": {
-                "font-size": "16px",
-                "color": "#2c3e50",
-                "margin": "0px 10px",
-                "border-radius": "8px",
-                "padding": "12px 20px",
-                "transition": "all 0.3s ease"
-            },
-            "nav-link-selected": {
-                "background-color": "#4a90e2", 
-                "color": "white",
-                "box-shadow": "0 2px 8px rgba(72,144,224,0.3)"
-            },
+            "container": {"padding": "10px", "background-color": "#f8f9fa"},
+            "nav-link": {"font-size": "14px", "margin": "0 10px"}
         }
     )
 
