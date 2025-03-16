@@ -15,6 +15,62 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def css():
+    st.markdown("""
+    <style>
+        /* Container principal */
+        [data-testid="stAppViewContainer"] {
+            background: #f8fafc;
+        }
+        
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background: #ffffff !important;
+            border-right: 1px solid #e2e8f0;
+        }
+        
+        /* Select boxes */
+        div[data-baseweb="select"] > div {
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease;
+        }
+        
+        div[data-baseweb="select"] > div:hover {
+            border-color: #94a3b8 !important;
+            box-shadow: 0 1px 3px rgba(148,163,184,0.1);
+        }
+        
+        /* Slider */
+        div[data-testid="stSlider"] > div {
+            padding: 12px 15px;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        /* Expander */
+        div[data-testid="stExpander"] details {
+            background: #ffffff;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 10px !important;
+        }
+        
+        /* Tabs */
+        [data-testid="stTabs"] button {
+            padding: 10px 20px !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        /* Gráficos */
+        .js-plotly-plot .plot-container {
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 @st.cache_data(ttl=600)
 def load_data() -> pd.DataFrame | None:
     try:
