@@ -168,8 +168,8 @@ def exibir_estatisticas():
     with st.sidebar:
         st.header("Filtros")
         ano = st.selectbox("Ano", ["Todos"] + sorted(df['Ano'].unique(), reverse=True))
-        estado = st.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
-        regiao = st.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+        estado = st.selectbox("Estado", ["Todos"] + sorted(df['UF'].unique()))  # Alterado para UF
+        regiao = st.selectbox("Região", ["Todas"] + sorted(df['Região'].unique()))  # Nome corrigido
 
     filtered_df = filter_data(df, ano, estado, regiao)
 
