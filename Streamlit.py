@@ -48,13 +48,27 @@ def load_data() -> pd.DataFrame | None:
         st.error(f"Erro ao carregar dados: {e}")
         return None
 
-def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
-    """Filtra os dados de acordo com ano, estado e região."""
-    return df[
-        (df['Ano'] == ano) &
-        ((df['Estados'] == estado) if estado != "Todos" else True) &
-        ((df['Regiões'] == regiao) if regiao != "Todas" else True)
+def filter_data(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
+    """Filtra dados com múltiplos critérios usando um dicionário de filtros"""
+    filtered_df = df.copy()
+    if filters['ano'] != "Todos":
+        filtered_df = filtered_df[filtered_df['Ano'] == filters['ano']]
+    
+    if "Todos" not in filters['estados']:
+        filtered_df = filtered_df[filtered_df['Estados'].isin(filters['estados'])]
+    
+    if "Todas" not in filters['regioes']:
+        filtered_df = filtered_df[filtered_df['Regiões'].isin(filters['regioes'])]
+    
+    filtered_df = filtered_df[
+        (filtered_df['População'] >= filters['pop_min']) & 
+        (filtered_df['População'] <= filters['pop_max'])
     ]
+    if filters['municipio']:
+        sugestoes = sugerir_municipios(filters['municipio'], filtered_df)
+        filtered_df = filtered_df[filtered_df['Município'].isin(sugestoes)]
+    
+    return filtered_df
 
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
