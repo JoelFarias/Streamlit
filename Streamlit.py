@@ -63,9 +63,10 @@ def load_data() -> pd.DataFrame | None:
             password=st.secrets["DB_PASSWORD"]
         )
         query = """
-        SELECT p.ano_pesquisa, p.numero_habitantes, p.faixa_populacao, 
-               m.nome_municipio, u.nome_uf, r.nome_regiao, 
-               m.latitude, m.longitude 
+        SELECT p.ano_pesquisa, p.numero_habitantes, 
+               m.codigo_municipio_dv AS codigo, 
+               m.nome_municipio, u.sigla_uf, 
+               r.nome_regiao, m.latitude, m.longitude 
         FROM populacao p
         JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
         JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
@@ -73,12 +74,11 @@ def load_data() -> pd.DataFrame | None:
         """
         df = pd.read_sql(query, conn)
         mapeamento_colunas = {
-            'ano_pesquisa': 'Ano', 
+            'ano_pesquisa': 'Ano',
             'numero_habitantes': 'População',
-            'faixa_populacao': 'Faixa de População', 
+            'codigo': 'Código',
             'nome_municipio': 'Município',
             'sigla_uf': 'UF',
-            'nome_uf': 'Estados', 
             'nome_regiao': 'Regiões',
             'latitude': 'Latitude', 
             'longitude': 'Longitude'
@@ -168,6 +168,7 @@ def exibir_estatisticas():
 
     if not filtered_df.empty:
         st.header("Estatísticas Populacionais")
+        
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Municípios", len(filtered_df))
@@ -176,20 +177,18 @@ def exibir_estatisticas():
         with col3:
             st.metric("Média Municipal", f"{filtered_df['População'].mean():,.0f}")
 
-        min_pop = filtered_df.nsmallest(1, 'População').iloc[0]
-        max_pop = filtered_df.nlargest(1, 'População').iloc[0]
-        
-        def formatar_municipio(row):
-            return f"{row['Município']} ({row['Estados'][:2]}) - {row['Código']}"  # Supondo que existe a coluna 'Código'
+        min_row = filtered_df.loc[filtered_df['População'].idxmin()]
+        max_row = filtered_df.loc[filtered_df['População'].idxmax()]
 
         stats_data = {
-            "População Mínima": f"{formatar_municipio(min_pop)}: {min_pop['População']:,.0f} hab",
-            "População Máxima": f"{formatar_municipio(max_pop)}: {max_pop['População']:,.0f} hab",
+            "População Mínima": f"{min_row['Município']} ({min_row['UF']}) - {min_row['Código']}: {min_row['População']:,.0f} hab",
+            "População Máxima": f"{max_row['Município']} ({max_row['UF']}) - {max_row['Código']}: {max_row['População']:,.0f} hab",
             "Desvio Padrão": f"{filtered_df['População'].std():,.0f}",
             "1º Quartil": f"{filtered_df['População'].quantile(0.25):,.0f}",
             "Mediana": f"{filtered_df['População'].median():,.0f}",
             "3º Quartil": f"{filtered_df['População'].quantile(0.75):,.0f}"
         }
+
         stats_df = pd.DataFrame({
             "Métrica": stats_data.keys(),
             "Valor": stats_data.values()
@@ -203,7 +202,7 @@ def exibir_estatisticas():
             gridOptions={
                 "columnDefs": [
                     {"headerName": "Métrica", "field": "Métrica", "width": 150},
-                    {"headerName": "Valor", "field": "Valor", "width": 250}
+                    {"headerName": "Valor", "field": "Valor", "width": 400}
                 ]
             }
         )
