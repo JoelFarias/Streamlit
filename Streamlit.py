@@ -128,24 +128,30 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
         return
 
     try:
+        top_ufs = df.groupby('UF')['População'].sum().nlargest(10).index
+        df_filtered = df[df['UF'].isin(top_ufs)]
+
         if grafico == 'Barra':
             fig = px.bar(
-                df,
+                df_filtered,
                 x=x_col,
                 y=y_col,
                 color='UF',
                 template='plotly_white',
                 color_discrete_sequence=px.colors.sequential.Blues,
-                labels={'População': 'Habitantes'}
+                labels={'População': 'Habitantes'},
+                title=f"Top 10 UFs - {y_col} por {x_col}"
             )
         elif grafico == 'Linha':
+            df_agg = df_filtered.groupby([x_col, 'UF'])[y_col].sum().reset_index()
             fig = px.line(
-                df.groupby([x_col, 'UF'])[y_col].sum().reset_index(),
+                df_agg,
                 x=x_col,
                 y=y_col,
                 color='UF',
                 markers=True,
-                color_discrete_sequence=px.colors.qualitative.Pastel
+                color_discrete_sequence=px.colors.qualitative.Pastel,
+                title="Evolução Populacional das 10 Maiores UFs"
             )
             
         fig.update_layout(
@@ -153,9 +159,13 @@ def display_graphs(df: pd.DataFrame, x_col: str, y_col: str, grafico: str):
             xaxis_title='',
             yaxis_title='População',
             margin=dict(l=20, r=20, t=40, b=20),
-            hoverlabel=dict(
-                bgcolor='white',
-                font_size=14
+            legend=dict(
+                title='UF',
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1
             )
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -281,6 +291,14 @@ def exibir_visualizacao():
 
     with st.sidebar:
         st.header("⚙️ Filtros de Visualização")
+         top_n = st.slider(
+            "Número de UFs a mostrar",
+            min_value=5,
+            max_value=20,
+            value=10,
+            help="Selecione quantas Unidades Federativas deseja visualizar"
+        )
+        
         ano = st.selectbox(
             "Ano de Referência",
             options=sorted(df['Ano'].unique(), reverse=True),
