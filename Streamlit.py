@@ -18,56 +18,15 @@ st.set_page_config(
 def css():
     st.markdown("""
     <style>
-        /* Container principal */
-        [data-testid="stAppViewContainer"] {
-            background: #f8fafc;
-        }
-        
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background: #ffffff !important;
-            border-right: 1px solid #e2e8f0;
-        }
-        
-        /* Select boxes */
-        div[data-baseweb="select"] > div {
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 8px !important;
-            transition: all 0.2s ease;
-        }
-        
-        div[data-baseweb="select"] > div:hover {
-            border-color: #94a3b8 !important;
-            box-shadow: 0 1px 3px rgba(148,163,184,0.1);
-        }
-        
-        /* Slider */
-        div[data-testid="stSlider"] > div {
-            padding: 12px 15px;
-            background: #ffffff;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        /* Expander */
-        div[data-testid="stExpander"] details {
-            background: #ffffff;
-            border: 1px solid #e2e8f0 !important;
-            border-radius: 10px !important;
-        }
-        
-        /* Tabs */
-        [data-testid="stTabs"] button {
-            padding: 10px 20px !important;
-            border-radius: 8px !important;
-            transition: all 0.2s ease !important;
-        }
-        
-        /* Gráficos */
-        .js-plotly-plot .plot-container {
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
+        [data-testid="stAppViewContainer"] {background: #f8fafc;}
+        [data-testid="stSidebar"] {background: #ffffff!important; border-right: 1px solid #e2e8f0;}
+        div[data-baseweb="select"] > div {border: 1px solid #cbd5e1!important; border-radius: 8px!important;}
+        div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] {gap: 1rem;}
+        div[data-testid="stMetric"] {background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;}
+        div[data-testid="stMetric"] > div {justify-content: space-between;}
+        div[data-testid="stMetricLabel"] {color: #64748b;}
+        div[data-testid="stMetricValue"] {color: #1e293b; font-weight: 600;}
+        .stPlotlyChart {border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -104,28 +63,25 @@ def load_data() -> pd.DataFrame | None:
         st.error(f"Erro ao carregar dados: {e}")
         return None
 
-def filter_data(df, ano, estado, regiao, faixa_pop, municipio):
+def filter_data(df, ano, estados, regioes, pop_min, pop_max, municipio):
     filtered = df.copy()
     
     if ano != "Todos":
         filtered = filtered[filtered["Ano"] == ano]
     
-    if estado != "Todos":
-        filtered = filtered[filtered["Estados"] == estado]
+    if "Todos" not in estados:
+        filtered = filtered[filtered["Estados"].isin(estados)]
     
-    if regiao != "Todas":
-        filtered = filtered[filtered["Regiões"] == regiao]
+    if "Todas" not in regioes:
+        filtered = filtered[filtered["Regiões"].isin(regioes)]
     
-    filtered = filtered[
-        (filtered["População"] >= faixa_pop[0]) & 
-        (filtered["População"] <= faixa_pop[1])]
+    filtered = filtered[(filtered["População"] >= pop_min) & (filtered["População"] <= pop_max)]
     
     if municipio:
         sugestoes = sugerir_municipios(municipio, filtered)
         filtered = filtered[filtered["Município"].isin(sugestoes)]
     
     return filtered
-
 
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
