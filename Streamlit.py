@@ -63,30 +63,37 @@ def load_data() -> pd.DataFrame | None:
             password=st.secrets["DB_PASSWORD"]
         )
         query = """
-        SELECT p.ano_pesquisa, p.numero_habitantes, 
-               m.codigo_municipio_dv AS codigo, 
-               m.nome_municipio, u.sigla_uf, 
-               r.nome_regiao, m.latitude, m.longitude 
+        SELECT p.ano_pesquisa, 
+               p.numero_habitantes,
+               m.codigo_municipio_dv AS codigo,
+               m.nome_municipio,
+               u.sigla_uf AS uf,
+               r.nome_regiao,
+               m.latitude,
+               m.longitude 
         FROM populacao p
         JOIN municipio m ON p.codigo_municipio_dv = m.codigo_municipio_dv
         JOIN unidade_federacao u ON m.cd_uf = u.cd_uf
         JOIN regiao r ON u.cd_regiao = r.cd_regiao
         """
         df = pd.read_sql(query, conn)
+        
         mapeamento_colunas = {
             'ano_pesquisa': 'Ano',
             'numero_habitantes': 'População',
             'codigo': 'Código',
             'nome_municipio': 'Município',
-            'sigla_uf': 'UF',
-            'nome_regiao': 'Regiões',
-            'latitude': 'Latitude', 
+            'uf': 'UF',
+            'nome_regiao': 'Região',
+            'latitude': 'Latitude',
             'longitude': 'Longitude'
         }
+        
         df.rename(columns=mapeamento_colunas, inplace=True)
         df['Ano'] = df['Ano'].astype(str)
         df['População'] = pd.to_numeric(df['População'], errors='coerce')
         return df.dropna(subset=['População'])
+        
     except (pg.Error, Exception) as e:
         st.error(f"Erro ao carregar dados: {e}")
         return None
