@@ -104,21 +104,28 @@ def load_data() -> pd.DataFrame | None:
         st.error(f"Erro ao carregar dados: {e}")
         return None
 
-def filter_data(df: pd.DataFrame, ano: str, estado: str, regiao: str) -> pd.DataFrame:
-    """Filtra os dados mantendo compatibilidade com chamadas existentes"""
-    conditions = []
+def filter_data(df, ano, estado, regiao, faixa_pop, municipio):
+    filtered = df.copy()
+    
     if ano != "Todos":
-        conditions.append(df['Ano'] == ano)
+        filtered = filtered[filtered["Ano"] == ano]
     
     if estado != "Todos":
-        conditions.append(df['Estados'] == estado)
+        filtered = filtered[filtered["Estados"] == estado]
     
     if regiao != "Todas":
-        conditions.append(df['Regiões'] == regiao)
+        filtered = filtered[filtered["Regiões"] == regiao]
     
-    if conditions:
-        return df[pd.concat(conditions, axis=1).all(axis=1)]
-    return df
+    filtered = filtered[
+        (filtered["População"] >= faixa_pop[0]) & 
+        (filtered["População"] <= faixa_pop[1])
+    
+    if municipio:
+        sugestoes = sugerir_municipios(municipio, filtered)
+        filtered = filtered[filtered["Município"].isin(sugestoes)]
+    
+    return filtered
+
 
 def get_dataframe() -> pd.DataFrame | None:
     return st.session_state.get('df', None)
