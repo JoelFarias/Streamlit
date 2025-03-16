@@ -112,9 +112,13 @@ def carregar_dados():
 def exibir_estatisticas():
     df = get_dataframe()
     if df is not None:
-        ano_pesquisa = st.sidebar.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
-        estado = st.sidebar.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
-        regiao = st.sidebar.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
+        col1, col2, col3 = st.sidebar.columns([3, 2, 2])
+        with col1:
+            ano_pesquisa = st.selectbox("Ano da Pesquisa", sorted(df['Ano'].unique(), reverse=True))
+        with col2:
+            estado = st.selectbox("Estado", ["Todos"] + sorted(df['Estados'].unique()))
+        with col3:
+            regiao = st.selectbox("Região", ["Todas"] + sorted(df['Regiões'].unique()))
 
         filtered_df = filter_data(df, ano_pesquisa, estado, regiao)
 
@@ -123,14 +127,14 @@ def exibir_estatisticas():
             max_pop = filtered_df.loc[filtered_df['População'].idxmax()]
             
             stats_data = {
-                "count": ("Quantidade de Municípios", f"{len(filtered_df):,}"),
-                "mean": ("Média Populacional", f"{filtered_df['População'].mean():,.2f}"),
-                "std": ("Desvio Padrão", f"{filtered_df['População'].std():,.2f}"),
-                "min": ("Menor População", f"{min_pop['Município']} ({min_pop['População']:,.0f} hab)"),
-                "25%": ("1º Quartil", f"{filtered_df['População'].quantile(0.25):,.0f}"),
-                "50%": ("Mediana", f"{filtered_df['População'].median():,.0f}"),
-                "75%": ("3º Quartil", f"{filtered_df['População'].quantile(0.75):,.0f}"),
-                "max": ("Maior População", f"{max_pop['Município']} ({max_pop['População']:,.0f} hab)")
+                "count": ("🏙️ Quantidade de Municípios", f"{len(filtered_df):,}"),
+                "mean": ("📊 Média Populacional", f"{filtered_df['População'].mean():,.2f}"),
+                "std": ("📈 Desvio Padrão", f"{filtered_df['População'].std():,.2f}"),
+                "min": ("🔻 Menor População", f"{min_pop['Município']} ({min_pop['População']:,.0f} hab)"),
+                "25%": ("📉 1º Quartil", f"{filtered_df['População'].quantile(0.25):,.0f}"),
+                "50%": ("📐 Mediana", f"{filtered_df['População'].median():,.0f}"),
+                "75%": ("📈 3º Quartil", f"{filtered_df['População'].quantile(0.75):,.0f}"),
+                "max": ("🔺 Maior População", f"{max_pop['Município']} ({max_pop['População']:,.0f} hab)")
             }
 
             stats = pd.DataFrame({
@@ -139,16 +143,21 @@ def exibir_estatisticas():
             })
 
             gb = GridOptionsBuilder.from_dataframe(stats)
-            gb.configure_column("Métrica", header_name="Métrica", width=250)
-            gb.configure_column("Valor", header_name="Valor", width=300)
+            gb.configure_column("Métrica", headerName="Métrica", width=300, cellStyle={'font-weight': 'bold'})
+            gb.configure_column("Valor", headerName="Valor", width=200, type=["rightAligned"])
+            gb.configure_grid_options(domLayout='autoHeight', suppressRowHoverHighlight=True)
             grid_options = gb.build()
 
-            st.write("### Estatísticas Descritivas da População:")
-            AgGrid(stats, gridOptions=grid_options, height=300)
+            st.markdown("### 📌 Estatísticas Detalhadas")
+            AgGrid(stats, 
+                 gridOptions=grid_options,
+                 height=350,
+                 fit_columns_on_grid_load=True,
+                 theme='streamlit')
 
         else:
-            st.warning("Nenhum dado encontrado para os filtros selecionados.")
-
+            st.warning("⚠️ Nenhum dado encontrado para os filtros selecionados.")
+            
 def remover_acentos_e_lower(texto: str) -> str:
     return ''.join(
         c for c in unicodedata.normalize('NFD', texto)
